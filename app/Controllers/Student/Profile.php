@@ -22,7 +22,8 @@ class Profile extends BaseController
         }
 
         $studentModel = new StudentModel();
-        $student = $studentModel->where('lrn', 'DEMO-STUDENT-001')->first();
+        $user = $this->auth->user();
+        $student = $studentModel->where('user_id', $user->id)->first();
 
         if (!$student) {
             return redirect()->to(base_url('student/dashboard'))->with('error', 'Student profile not found.');
@@ -46,7 +47,7 @@ class Profile extends BaseController
             'last_name' => 'required|max_length[100]',
             'email' => 'required|valid_email|max_length[255]',
             'phone' => 'max_length[20]',
-            'address' => 'max_length[255]'
+            'address' => 'max_length[500]'
         ];
 
         if (!$this->validate($rules)) {
@@ -54,7 +55,8 @@ class Profile extends BaseController
         }
 
         $studentModel = new StudentModel();
-        $student = $studentModel->where('lrn', 'DEMO-STUDENT-001')->first();
+        $user = $this->auth->user();
+        $student = $studentModel->where('user_id', $user->id)->first();
         
         if (!$student) {
             return redirect()->back()->with('error', 'Student not found.');
@@ -65,11 +67,18 @@ class Profile extends BaseController
             'middle_name' => $this->request->getPost('middle_name'),
             'last_name' => $this->request->getPost('last_name'),
             'email' => $this->request->getPost('email'),
-            'phone' => $this->request->getPost('phone'),
+            'contact_number' => $this->request->getPost('phone'),
             'address' => $this->request->getPost('address')
         ];
 
-        if ($studentModel->update($student['id'], $data)) {
+        $updateResult = $studentModel->update($student['id'], $data);
+        
+        if ($updateResult) {
+            // Also update the user's email in users table if email changed
+            if ($data['email'] !== $student['email']) {
+                $userModel = new UserModel();
+                $userModel->update($user->id, ['email' => $data['email']]);
+            }
             return redirect()->back()->with('success', 'Profile updated successfully!');
         } else {
             return redirect()->back()->with('error', 'Failed to update profile.');
@@ -99,28 +108,52 @@ class Profile extends BaseController
         $user = $this->auth->user();
         
         // Verify current password using Shield's method
-        $db = \Config\Database::connect();
-        $identity = $db->table('auth_identities')
-            ->where('user_id', $user->id)
-            ->where('type', 'email_password')
-            ->get()
-            ->getRow();
+        try {
+            $db = \Config\Database::connect();
+            $identity = $db->table('auth_identities')
+                ->where('user_id', $user->id)
+                ->where('type', 'email_password')
+                ->get()
+                ->getRow();
+                
+            if (!$identity) {
+                log_message('error', 'No identity found for user ID: ' . $user->id);
+                return redirect()->back()->with('error', 'User authentication record not found.');
+            }
             
-        if (!$identity || !password_verify($currentPassword, $identity->secret)) {
-            return redirect()->back()->with('error', 'Current password is incorrect.');
+            // Debug logging
+            log_message('info', 'Password verification attempt for user ID: ' . $user->id);
+            
+            if (!password_verify($currentPassword, $identity->secret)) {
+                log_message('warning', 'Password verification failed for user ID: ' . $user->id);
+                return redirect()->back()->with('error', 'Current password is incorrect.');
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Password verification error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'An error occurred during password verification.');
         }
 
         // Update password in auth_identities table
-        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-        $result = $db->table('auth_identities')
-            ->where('user_id', $user->id)
-            ->where('type', 'email_password')
-            ->update(['secret' => $hashedPassword]);
+        try {
+            $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+            $result = $db->table('auth_identities')
+                ->where('user_id', $user->id)
+                ->where('type', 'email_password')
+                ->update([
+                    'secret' => $hashedPassword,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
 
-        if ($result) {
-            return redirect()->back()->with('success', 'Password changed successfully!');
-        } else {
-            return redirect()->back()->with('error', 'Failed to change password.');
+            if ($result) {
+                log_message('info', 'Password updated successfully for user ID: ' . $user->id);
+                return redirect()->back()->with('success', 'Password changed successfully!');
+            } else {
+                log_message('error', 'Failed to update password for user ID: ' . $user->id);
+                return redirect()->back()->with('error', 'Failed to change password.');
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Password update error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'An error occurred while updating password.');
         }
     }
 }
