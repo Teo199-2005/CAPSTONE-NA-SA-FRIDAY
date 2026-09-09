@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <div class="container-fluid">
@@ -56,7 +56,7 @@
                                             </td>
                                             <td><?= esc($student['email']) ?></td>
                                             <td>
-                                                <span class="badge bg-info">Grade <?= $student['grade_level'] ?></span>
+                                                <span class="badge bg-info"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></span>
                                             </td>
                                             <td>
                                                 <?php 

@@ -1,323 +1,327 @@
 <?php
-
 namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\StudentModel;
 use App\Models\TeacherModel;
-use App\Models\SectionModel;
+// use App\Models\UserModel;
 use App\Models\AnnouncementModel;
-use App\Models\GradeModel;
-use App\Models\EnrollmentDocumentModel;
-use CodeIgniter\Shield\Models\UserModel;
+use App\Models\SectionModel;
 
 class Dashboard extends BaseController
 {
-    protected $auth;
-    
-    public function __construct()
-    {
-        $this->auth = auth();
-    }
-
     public function index()
     {
-        // Check if user is admin
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
-        }
-
         $studentModel = new StudentModel();
         $teacherModel = new TeacherModel();
-        $sectionModel = new SectionModel();
+        // $userModel = new UserModel();
         $announcementModel = new AnnouncementModel();
-        $systemSettingModel = new \App\Models\SystemSettingModel();
-
-        // Get dashboard statistics
-        $stats = [
-            'total_students' => $studentModel->where('enrollment_status', 'enrolled')->countAllResults(),
-            'pending_enrollments' => $studentModel->where('enrollment_status', 'pending')->countAllResults(),
-            'total_teachers' => $teacherModel->where('employment_status', 'active')->countAllResults(),
-            'total_sections' => $sectionModel->where('is_active', true)->countAllResults(),
-            'total_announcements' => $announcementModel->countAllResults()
-        ];
-
-        // Get recent enrollments (all statuses)
-        $recentEnrollments = $studentModel->select('students.*, users.email')
-            ->join('users', 'users.id = students.user_id', 'left')
-            ->orderBy('created_at', 'DESC')
-            ->limit(5)
-            ->findAll();
-
-        // Get enrollment statistics by grade level
+        
+        $selectedYear = $this->request->getGet('year') ?? date('Y');
+        // Get current term from system settings, fallback to session, then default to 1
+        try {
+            $systemSettingModel = new \App\Models\SystemSettingModel();
+            $currentTerm = $systemSettingModel->getCurrentTerm();
+            if (!$currentTerm) {
+                $currentTerm = session()->get('current_term') ?? 1;
+            }
+        } catch (\Exception $e) {
+            $currentTerm = session()->get('current_term') ?? 1;
+        }
+        
+        // Get enrollment by grade for selected school year.
+        // Use the same school year format as the sections page for consistency.
+        helper('school_year');
+        $schoolYear = get_current_school_year();
+        $db = \Config\Database::connect();
+        helper('grade_level');
         $enrollmentByGrade = [];
-        for ($grade = 7; $grade <= 12; $grade++) {
-            $enrollmentByGrade[$grade] = $studentModel->where('grade_level', $grade)
-                ->where('enrollment_status', 'enrolled')
-                ->countAllResults();
+        foreach (grade_level_options() as $grade) {
+            $row = $db->query("
+                SELECT COUNT(*) AS total
+                FROM students st
+                LEFT JOIN sections s ON s.id = st.section_id
+                WHERE st.grade_level = ?
+                  AND st.enrollment_status = 'enrolled'
+                  AND st.deleted_at IS NULL
+                  AND (
+                        (st.section_id IS NOT NULL AND s.school_year = ?)
+                        OR
+                        (st.section_id IS NULL AND st.school_year = ?)
+                        OR
+                        (st.section_id IS NULL AND (st.school_year IS NULL OR st.school_year = '') AND YEAR(st.created_at) = ?)
+                  )
+            ", [$grade, $schoolYear, $schoolYear, $selectedYear])->getRow();
+
+            $enrollmentByGrade[$grade] = (int) ($row->total ?? 0);
         }
 
+        $enrollmentChartLabels = grade_level_chart_labels();
+        $enrollmentChartValues = array_map(
+            static fn (int $g): int => (int) ($enrollmentByGrade[$g] ?? 0),
+            grade_level_options()
+        );
+        
+        // Get recent enrollments
+        $recentEnrollments = $studentModel->orderBy('created_at', 'DESC')
+                                         ->limit(10)
+                                         ->findAll();
+        
         // Get recent announcements
         $recentAnnouncements = $announcementModel->orderBy('created_at', 'DESC')
-            ->limit(5)
-            ->findAll();
-
-        // Get enrollment data for charts - use real database data
-        $enrollmentData = $this->getEnrollmentDataFromDB();
-        $predictionData = $this->generatePredictions($enrollmentData);
+                                                ->limit(5)
+                                                ->findAll();
         
-        // Get current month enrollments for real-time updates
-        $db = \Config\Database::connect();
-        
-        // Get monthly enrollment data for enrolled students chart
-        $monthlyEnrollmentData = $this->getMonthlyEnrollmentData();
-        
-        // Count all students enrolled in current school year (2025-2026)
-        $currentMonthEnrollments = $db->query("
-            SELECT COUNT(*) as count FROM students 
-            WHERE enrollment_status = 'enrolled' 
-            AND school_year = '2025-2026'
-            AND deleted_at IS NULL
-        ")->getRow()->count ?? 0;
-
-        return view('admin/dashboard', [
-            'title' => 'Admin Dashboard - LPHS SMS',
-            'stats' => $stats,
-            'recentEnrollments' => $recentEnrollments,
-            'enrollmentByGrade' => $enrollmentByGrade,
-            'recentAnnouncements' => $recentAnnouncements,
-            'enrollmentData' => $enrollmentData,
-            'enrollmentDataJson' => json_encode($enrollmentData),
-            'predictionData' => json_encode($predictionData),
-            'monthlyEnrollmentData' => json_encode($monthlyEnrollmentData),
-            'currentMonthEnrollments' => $currentMonthEnrollments,
-            'currentQuarter' => $systemSettingModel->getCurrentQuarter()
-        ]);
-    }
-
-    public function enrollments()
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
-        }
-
-        $studentModel = new StudentModel();
-        $sectionModel = new SectionModel();
-
-        $status = $this->request->getGet('status') ?? 'pending';
-        $gradeLevel = $this->request->getGet('grade');
-
-        $builder = $studentModel->select('students.*, sections.section_name')
-            ->join('sections', 'sections.id = students.section_id', 'left')
-            ->where('enrollment_status', $status);
-
-        if ($gradeLevel) {
-            $builder->where('students.grade_level', $gradeLevel);
-        }
-
-        $students = $builder->orderBy('students.created_at', 'DESC')->findAll();
-
-        // Get available sections for assignment (needed for both pending and approved students)
+        // Get available years
+        $availableYears = [];
         $currentYear = date('Y');
-        $schoolYear = $currentYear . '-' . ($currentYear + 1);
-        $availableSections = [];
-        for ($grade = 7; $grade <= 10; $grade++) {
-            $availableSections[$grade] = $sectionModel->getAvailableSections($grade, $schoolYear);
+        for ($year = $currentYear - 2; $year <= $currentYear + 1; $year++) {
+            $availableYears[] = $year;
         }
 
-        return view('admin/enrollments', [
-            'title' => 'Manage Enrollments - LPHS SMS',
-            'students' => $students,
-            'status' => $status,
-            'gradeLevel' => $gradeLevel,
-            'availableSections' => $availableSections
-        ]);
-    }
-
-    public function approveEnrollment($studentId)
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
+        // Get registration and grading status
+        $systemSettingModel = new \App\Models\SystemSettingModel();
+        $registrationSetting = $systemSettingModel->getSetting('registration_enabled', null);
+        if ($registrationSetting === null) {
+            $registrationSetting = $systemSettingModel->getSetting('enrollment_enabled', 1); // backward compatibility
         }
+        $registrationEnabled = (bool) $registrationSetting;
+        $gradingEnabled = (bool) $systemSettingModel->getSetting('grading_enabled', 1);
 
-        $studentModel = new StudentModel();
-        $sectionModel = new SectionModel();
-        $sectionId = $this->request->getPost('section_id');
-
-        $student = $studentModel->find($studentId);
-        if (! $student) {
-            return redirect()->back()->with('error', 'Student not found.');
-        }
-
-        // If section is provided, verify it has capacity
-        if (!empty($sectionId)) {
-            if (!$sectionModel->hasAvailableSlots($sectionId)) {
-                return redirect()->back()->with('error', 'Selected section is at full capacity.');
+        helper('admin_access');
+        $adminStaffList = [];
+        try {
+            if (is_master_admin()) {
+                $adminStaffList = $db->query("
+                    SELECT u.id, u.email, u.first_name, u.last_name
+                    FROM users u
+                    INNER JOIN auth_groups_users ag ON ag.user_id = u.id AND ag.`group` = 'admin_staff'
+                    WHERE u.deleted_at IS NULL
+                    ORDER BY u.id DESC
+                ")->getResultArray();
             }
-        } else {
-            // Auto-assign to best available section if none selected
-            $currentYear = date('Y');
-            $schoolYear = $currentYear . '-' . ($currentYear + 1);
-            $best = $sectionModel->selectBestAvailableSection((int) ($student['grade_level'] ?? 0), $schoolYear);
-            if ($best) {
-                $sectionId = (int) $best['id'];
-            } else {
-                return redirect()->back()->with('error', 'No available sections found for Grade ' . $student['grade_level'] . '. Please create a new section or increase capacity.');
-            }
+        } catch (\Throwable $e) {
+            $adminStaffList = [];
         }
-
-        // Transition logic: pending -> approved, approved -> enrolled
-        if ($student['enrollment_status'] === 'pending') {
-            // Approve first; StudentModel will generate student_id and set section if provided
-            $ok = $studentModel->approveEnrollment($studentId, $sectionId ?: null);
-            if (! $ok) {
-                return redirect()->back()->with('error', 'Failed to approve enrollment.');
-            }
-
-            // If we have a section, enroll directly
-            if (! empty($sectionId)) {
-                $currentYear = date('Y');
-                $schoolYear = $currentYear . '-' . ($currentYear + 1);
-                $studentModel->enrollStudent($studentId, (int) $sectionId, $schoolYear);
-                $sectionModel->updateEnrollmentCount((int) $sectionId);
-
-                // Get section name for success message
-                $section = $sectionModel->find($sectionId);
-                $sectionName = $section ? $section['section_name'] : 'Unknown Section';
-
-                return redirect()->back()->with('success', "Student approved and assigned to {$sectionName}.");
-            }
-            return redirect()->back()->with('success', 'Student approved. Assign a section to complete enrollment.');
-        }
-
-        if ($student['enrollment_status'] === 'approved') {
-            if (empty($sectionId)) {
-                return redirect()->back()->with('error', 'Please select a section to enroll the student.');
-            }
-            $currentYear = date('Y');
-            $schoolYear = $currentYear . '-' . ($currentYear + 1);
-            $ok = $studentModel->enrollStudent($studentId, (int) $sectionId, $schoolYear);
-            if ($ok) {
-                $sectionModel->updateEnrollmentCount((int) $sectionId);
-                return redirect()->back()->with('success', 'Student enrolled successfully.');
-            }
-            return redirect()->back()->with('error', 'Failed to enroll student.');
-        }
-
-        return redirect()->back()->with('info', 'No action taken. Current status: ' . ucfirst($student['enrollment_status']));
-    }
-
-    public function rejectEnrollment($studentId)
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
-        }
-
-        $studentModel = new StudentModel();
-        $reason = $this->request->getPost('reason');
-
-        // Get student info before rejection for logging
-        $student = $studentModel->find($studentId);
         
-        if ($studentModel->rejectEnrollment($studentId, $reason)) {
-            // Log the rejection for debugging
-            log_message('info', "Student enrollment rejected: ID {$studentId}, Name: {$student['first_name']} {$student['last_name']}");
-            return redirect()->back()->with('success', 'Student enrollment rejected.');
-        }
+        $data = [
+            'title' => 'Admin Dashboard - CSCS SMS',
+            'total_students' => $studentModel->where('enrollment_status', 'enrolled')->countAllResults(),
+            'total_teachers' => $teacherModel->countAll(),
+            'total_users' => 0, // $userModel->countAll(),
+            'pending_enrollments' => $studentModel->where('enrollment_status', 'pending')->countAllResults(),
+            'currentTerm' => $currentTerm,
+            'selectedYear' => $selectedYear,
+            'availableYears' => $availableYears,
+            'enrollmentByGrade' => $enrollmentByGrade,
+            'enrollmentChartLabels' => $enrollmentChartLabels,
+            'enrollmentChartValues' => $enrollmentChartValues,
+            'recentEnrollments' => $recentEnrollments,
+            'recentAnnouncements' => $recentAnnouncements,
+            'registrationEnabled' => $registrationEnabled,
+            'gradingEnabled' => $gradingEnabled,
+            'adminStaffList' => $adminStaffList,
+        ];
 
-        return redirect()->back()->with('error', 'Failed to reject enrollment.');
+        return view('admin/dashboard', $data);
     }
 
-    public function students()
+    public function createAdmin()
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
+        helper('admin_access');
+
+        if (! is_master_admin()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Only a master administrator can create admin accounts.',
+            ]);
         }
 
-        $studentModel = new StudentModel();
-        $sectionModel = new SectionModel();
-        $gradeLevel = $this->request->getGet('grade');
-        $section = $this->request->getGet('section');
-        $search = $this->request->getGet('search');
-
-        $builder = $studentModel->select('students.*, sections.section_name')
-            ->join('sections', 'sections.id = students.section_id', 'left')
-            ->where('enrollment_status', 'enrolled');
-
-        if ($gradeLevel) {
-            $builder->where('students.grade_level', $gradeLevel);
+        if ($this->request->getMethod() !== 'POST') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
         }
 
-        if ($section) {
-            $builder->where('students.section_id', $section);
+        $email = $this->request->getPost('email');
+        $firstName = $this->request->getPost('first_name');
+        $lastName = $this->request->getPost('last_name');
+        $password = $this->request->getPost('password');
+        $accountType = $this->request->getPost('account_type');
+        $pages = $this->request->getPost('pages');
+
+        if (empty($email) || empty($firstName) || empty($lastName) || empty($password)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'All fields are required']);
         }
 
-        if ($search) {
-            $builder->groupStart()
-                ->like('students.first_name', $search)
-                ->orLike('students.last_name', $search)
-                ->orLike('students.lrn', $search)
-                ->groupEnd();
+        if (! in_array($accountType, ['master', 'staff'], true)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid account type.']);
         }
 
-        $students = $builder->orderBy('students.last_name', 'ASC')->findAll();
+        $group = $accountType === 'staff' ? 'admin_staff' : 'admin';
+        $allowedPagesJson = null;
 
-        // Get all sections for the dropdown
-        $allSections = $sectionModel->select('id, section_name, grade_level')
-            ->where('is_active', true)
-            ->orderBy('grade_level', 'ASC')
-            ->orderBy('section_name', 'ASC')
-            ->findAll();
+        if ($group === 'admin_staff') {
+            $pageList = is_array($pages) ? $pages : [];
+            $pageList = array_values(array_intersect(admin_valid_page_keys(), $pageList));
+            if ($pageList === []) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Select at least one page for admin staff.',
+                ]);
+            }
+            $allowedPagesJson = json_encode($pageList);
+        }
 
-        return view('admin/students', [
-            'title' => 'Manage Students - LPHS SMS',
-            'students' => $students,
-            'gradeLevel' => $gradeLevel,
-            'section' => $section,
-            'search' => $search,
-            'allSections' => $allSections
-        ]);
+        $db = \Config\Database::connect();
+
+        $existing = $db->table('users')->where('email', $email)->get()->getRow();
+        if ($existing) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Email already exists']);
+        }
+
+        $userData = [
+            'email' => $email,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'admin_allowed_pages' => $allowedPagesJson,
+            'created_at' => date('Y-m-d H:i:s', time()),
+            'updated_at' => date('Y-m-d H:i:s', time()),
+        ];
+
+        try {
+            if (! $db->table('users')->insert($userData)) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Failed to create admin account']);
+            }
+
+            $userId = $db->insertID();
+
+            $authData = [
+                'user_id' => $userId,
+                'type' => 'email_password',
+                'name' => $email,
+                'secret' => password_hash($password, PASSWORD_DEFAULT),
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ];
+
+            $db->table('auth_identities')->insert($authData);
+
+            $db->table('auth_groups_users')->insert([
+                'user_id' => $userId,
+                'group' => $group,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Admin account creation failed: ' . $e->getMessage());
+            // Rollback: delete the user if auth identity or group insertion failed
+            if (isset($userId)) {
+                $db->table('users')->where('id', $userId)->delete();
+            }
+            return $this->response->setJSON(['success' => false, 'message' => 'Failed to create admin account: ' . $e->getMessage()]);
+        }
+
+        $label = $group === 'admin_staff' ? 'Admin staff account' : 'Master admin account';
+
+        return $this->response->setJSON(['success' => true, 'message' => $label . ' created successfully']);
     }
-
-    public function teachers()
+    
+    public function updateTerm()
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
+        if ($this->request->getMethod() === 'POST') {
+            $term = (int) $this->request->getPost('term');
+
+            if ($term >= 1 && $term <= 3) {
+                session()->set('current_term', $term);
+
+                try {
+                    $systemSettingModel = new \App\Models\SystemSettingModel();
+
+                    $db = \Config\Database::connect();
+                    $db->query("CREATE TABLE IF NOT EXISTS `system_settings` (
+                        `id` int(11) NOT NULL AUTO_INCREMENT,
+                        `setting_key` varchar(100) NOT NULL,
+                        `setting_value` text,
+                        `description` text,
+                        `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        PRIMARY KEY (`id`),
+                        UNIQUE KEY `setting_key` (`setting_key`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                    $systemSettingModel->setCurrentTerm($term);
+                } catch (\Exception $e) {
+                    log_message('error', 'System settings update failed: ' . $e->getMessage());
+                }
+
+                return $this->response->setJSON(['success' => true, 'message' => 'Term updated successfully']);
+            }
+
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid term']);
         }
 
-        $teacherModel = new TeacherModel();
-        $teachers = $teacherModel->getActiveTeachers();
-
-        return view('admin/teachers', [
-            'title' => 'Manage Teachers - LPHS SMS',
-            'teachers' => $teachers
-        ]);
+        return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
     }
-
+    
+    public function toggleEnrollment()
+    {
+        if ($this->request->getMethod() === 'POST') {
+            $systemSettingModel = new \App\Models\SystemSettingModel();
+            $registrationSetting = $systemSettingModel->getSetting('registration_enabled', null);
+            if ($registrationSetting === null) {
+                $registrationSetting = $systemSettingModel->getSetting('enrollment_enabled', 1); // backward compatibility
+            }
+            $currentStatus = (bool) $registrationSetting;
+            $newStatus = !$currentStatus;
+            
+            // Write the new key; also write the old one for backward compatibility with any untouched pages
+            $systemSettingModel->setSetting('registration_enabled', $newStatus ? '1' : '0', 'Enable or disable student registration');
+            $systemSettingModel->setSetting('enrollment_enabled', $newStatus ? '1' : '0', 'Enable or disable student enrollment');
+            
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Registration ' . ($newStatus ? 'enabled' : 'disabled') . ' successfully',
+                'enabled' => $newStatus
+            ]);
+        }
+        
+        return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+    }
+    
+    public function toggleGrading()
+    {
+        if ($this->request->getMethod() === 'POST') {
+            $systemSettingModel = new \App\Models\SystemSettingModel();
+            $currentStatus = (bool) $systemSettingModel->getSetting('grading_enabled', 1);
+            $newStatus = !$currentStatus;
+            
+            $systemSettingModel->setSetting('grading_enabled', $newStatus ? '1' : '0', 'Enable or disable grade input for teachers');
+            
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Grading ' . ($newStatus ? 'enabled' : 'disabled') . ' successfully',
+                'enabled' => $newStatus
+            ]);
+        }
+        
+        return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+    }
+    
     public function sections()
     {
-        if (!$this->auth->user() || !$this->auth->user()->inGroup('admin')) {
+        if (!auth()->user() || !is_any_admin()) {
             return redirect()->to(base_url('/'));
-        }
-
-        // Auto-fix sections if cleanup parameter is present
-        if ($this->request->getGet('cleanup') === 'true') {
-            $this->cleanupSections();
-            return redirect()->to(base_url('admin/sections'))->with('success', 'Sections cleaned up successfully!');
         }
 
         $sectionModel = new SectionModel();
         $teacherModel = new TeacherModel();
-        $currentYear = date('Y');
-        $schoolYear = $currentYear . '-' . ($currentYear + 1);
+        $schoolYear = get_current_school_year();
 
         // Get filter parameters
         $gradeFilter = $this->request->getGet('grade');
         $adviserFilter = $this->request->getGet('adviser_status');
         $searchTerm = $this->request->getGet('search');
 
-        // Get sections with adviser information
-        $sections = $sectionModel->getSectionsWithAdviser($schoolYear);
+        // Get sections with adviser information (pass null to skip school year filter, show all)
+        $sections = $sectionModel->getSectionsWithAdviser(null);
 
         // Apply filters
         if (!empty($gradeFilter)) {
@@ -339,17 +343,15 @@ class Dashboard extends BaseController
             });
         }
 
-        // Get available teachers (those not currently assigned as advisers)
-        $availableTeachers = $teacherModel->getAvailableAdvisers();
-        
-        // Debug logging
-        log_message('info', 'Available teachers count: ' . count($availableTeachers));
-        foreach ($availableTeachers as $teacher) {
-            log_message('info', 'Teacher: ' . $teacher['first_name'] . ' ' . $teacher['last_name'] . ' (ID: ' . $teacher['id'] . ')');
-        }
+        // Get available teachers (exclude those who are already advisers)
+        $availableTeachers = $teacherModel->select('teachers.*')
+            ->where('teachers.id NOT IN (SELECT DISTINCT adviser_id FROM sections WHERE adviser_id IS NOT NULL)', null, false)
+            ->where('teachers.employment_status', 'active')
+            ->orderBy('teachers.last_name', 'ASC')
+            ->findAll();
 
         return view('admin/sections', [
-            'title' => 'Manage Sections & Faculty Assignment - LPHS SMS',
+            'title' => 'Manage Sections - CSCS SMS',
             'sections' => $sections,
             'availableTeachers' => $availableTeachers,
             'gradeFilter' => $gradeFilter,
@@ -358,120 +360,109 @@ class Dashboard extends BaseController
         ]);
     }
 
-    private function cleanupSections()
-    {
-        $db = \Config\Database::connect();
-        
-        // Find wrong section
-        $wrongSection = $db->query("SELECT id FROM sections WHERE section_name = 'Grade 10 - Aristotle'")->getRowArray();
-        $correctSection = $db->query("SELECT id FROM sections WHERE section_name = 'Aristotle'")->getRowArray();
-        $aphroditeSection = $db->query("SELECT id FROM sections WHERE section_name = 'Aphrodite'")->getRowArray();
-        
-        if ($wrongSection && $correctSection) {
-            // Move students from wrong section to correct section
-            $db->query("UPDATE students SET section_id = ? WHERE section_id = ?", [$correctSection['id'], $wrongSection['id']]);
-            // Delete wrong section
-            $db->query("DELETE FROM sections WHERE id = ?", [$wrongSection['id']]);
-        }
-        
-        if ($correctSection && $aphroditeSection) {
-            // Move Grade 10 students from Aphrodite to Aristotle
-            $db->query("UPDATE students SET section_id = ? WHERE (grade_level = 10 OR lrn LIKE 'DEMO-STUDENT-%') AND section_id = ?", [$correctSection['id'], $aphroditeSection['id']]);
-        }
-    }
-
     public function assignAdviser($sectionId)
     {
-        try {
-            if (!$this->auth->user()->inGroup('admin')) {
-                if ($this->request->isAJAX()) {
-                    return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized access']);
-                }
-                return redirect()->to(base_url('/'));
-            }
-
-            $sectionModel = new SectionModel();
-            $teacherModel = new TeacherModel();
-            $adviserId = $this->request->getPost('adviser_id');
-
-            if (empty($adviserId)) {
-                return redirect()->back()->with('error', 'Please select a teacher to assign as adviser.');
-            }
-
-            // Check if section exists
-            $section = $sectionModel->find($sectionId);
-            if (!$section) {
-                return redirect()->back()->with('error', 'Section not found.');
-            }
-
-            // Check if section already has an adviser
-            if (!empty($section['adviser_id'])) {
-                return redirect()->back()->with('error', 'This section already has an adviser assigned.');
-            }
-
-            // Check if teacher exists and is available
-            $teacher = $teacherModel->find($adviserId);
-            if (!$teacher) {
-                return redirect()->back()->with('error', 'Teacher not found.');
-            }
-
-            if ($teacher['employment_status'] !== 'active') {
-                return redirect()->back()->with('error', 'Selected teacher is not active.');
-            }
-
-            // Check if teacher is already assigned to another section
-            $existingAssignment = $sectionModel->where('adviser_id', $adviserId)
-                                              ->where('is_active', true)
-                                              ->first();
-            if ($existingAssignment) {
-                return redirect()->back()->with('error', 'This teacher is already assigned to another section.');
-            }
-
-            // Debug logging
-            log_message('info', "Attempting to assign teacher ID {$adviserId} to section ID {$sectionId}");
-            
-            // Assign the adviser using raw query to ensure it works
-            $db = \Config\Database::connect();
-            $result = $db->query("UPDATE sections SET adviser_id = ?, updated_at = NOW() WHERE id = ?", [$adviserId, $sectionId]);
-            
-            if ($result) {
-                // Verify the update worked
-                $updatedSection = $db->query("SELECT id, section_name, adviser_id FROM sections WHERE id = ?", [$sectionId])->getRowArray();
-                log_message('info', "Direct DB update result - Section {$sectionId} adviser_id: " . ($updatedSection['adviser_id'] ?? 'NULL'));
-                
-                if ($updatedSection && $updatedSection['adviser_id'] == $adviserId) {
-                    return redirect()->back()->with('success', 'Teacher successfully assigned as section adviser.');
-                } else {
-                    log_message('error', "Database update failed - adviser_id not set correctly for section {$sectionId}");
-                    return redirect()->back()->with('error', 'Assignment appeared successful but database was not updated.');
-                }
-            } else {
-                log_message('error', "Failed to assign teacher {$adviserId} to section {$sectionId}");
-                return redirect()->back()->with('error', 'Failed to assign teacher as adviser.');
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Error in assignAdviser: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'An error occurred while assigning the adviser.');
-        }
-    }
-
-    public function removeAdviser($sectionId)
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (!is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
         $sectionModel = new SectionModel();
+        $teacherModel = new TeacherModel();
+        $adviserId = $this->request->getPost('adviser_id');
 
-        // Check if section exists
+        if (empty($adviserId)) {
+            return redirect()->back()->with('error', 'Please select a teacher to assign as adviser.');
+        }
+
         $section = $sectionModel->find($sectionId);
         if (!$section) {
             return redirect()->back()->with('error', 'Section not found.');
         }
 
-        // Remove the adviser
-        $success = $sectionModel->update($sectionId, ['adviser_id' => null]);
+        $teacher = $teacherModel->find($adviserId);
+        if (!$teacher || $teacher['employment_status'] !== 'active') {
+            return redirect()->back()->with('error', 'Teacher not found or not active.');
+        }
+        
+        // Check if teacher is already an adviser
+        $db = \Config\Database::connect();
+        $existingAdviser = $db->table('sections')
+            ->where('adviser_id', $adviserId)
+            ->countAllResults();
+        
+        if ($existingAdviser > 0) {
+            return redirect()->back()->with('error', 'This teacher is already assigned as an adviser to another section.');
+        }
 
+        $result = $db->query("UPDATE sections SET adviser_id = ?, updated_at = NOW() WHERE id = ?", [$adviserId, $sectionId]);
+        
+        if ($result) {
+            return redirect()->back()->with('success', 'Teacher successfully assigned as section adviser.');
+        } else {
+            return redirect()->back()->with('error', 'Failed to assign teacher as adviser.');
+        }
+    }
+
+    public function getSectionTeachers($sectionId)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        $db = \Config\Database::connect();
+        
+        // Get adviser
+        $adviser = $db->table('sections s')
+            ->select('t.id, t.first_name, t.last_name, t.email')
+            ->join('teachers t', 't.id = s.adviser_id')
+            ->where('s.id', $sectionId)
+            ->get()->getRow();
+        
+        // Get subject teachers (including placeholder assignments)
+        $subjectTeachers = $db->table('teacher_schedules ts')
+            ->select('t.id, t.first_name, t.last_name, t.email, sub.subject_name, ts.day_of_week, ts.start_time, ts.end_time, ts.id as schedule_id')
+            ->join('teachers t', 't.id = ts.teacher_id')
+            ->join('subjects sub', 'sub.id = ts.subject_id', 'left')
+            ->where('ts.section_id', $sectionId)
+            ->groupBy('t.id, sub.id, ts.id')
+            ->get()->getResultArray();
+        
+        return $this->response->setJSON([
+            'success' => true,
+            'adviser' => $adviser,
+            'subjectTeachers' => $subjectTeachers
+        ]);
+    }
+
+    public function removeSubjectTeacher($scheduleId)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        $db = \Config\Database::connect();
+        $result = $db->table('teacher_schedules')->where('id', $scheduleId)->delete();
+        
+        if ($result) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Teacher removed successfully']);
+        }
+        
+        return $this->response->setJSON(['success' => false, 'message' => 'Failed to remove teacher']);
+    }
+
+    public function removeAdviser($sectionId)
+    {
+        if (!is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        $sectionModel = new SectionModel();
+        $section = $sectionModel->find($sectionId);
+        if (!$section) {
+            return redirect()->back()->with('error', 'Section not found.');
+        }
+
+        $success = $sectionModel->update($sectionId, ['adviser_id' => null]);
         if ($success) {
             return redirect()->back()->with('success', 'Adviser removed from section successfully.');
         } else {
@@ -481,20 +472,17 @@ class Dashboard extends BaseController
 
     public function getSectionStudents($sectionId)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (!is_any_admin()) {
             return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
         $studentModel = new StudentModel();
         $sectionModel = new SectionModel();
-
-        // Check if section exists
         $section = $sectionModel->find($sectionId);
         if (!$section) {
             return $this->response->setJSON(['success' => false, 'message' => 'Section not found']);
         }
 
-        // Get students in this section
         $students = $studentModel->select('id, lrn, first_name, last_name, created_at')
                                  ->where('section_id', $sectionId)
                                  ->where('enrollment_status', 'enrolled')
@@ -508,96 +496,358 @@ class Dashboard extends BaseController
         ]);
     }
 
-    public function getUnassignedStudents($gradeLevel)
+    public function getSectionSubjects($sectionId)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (!is_any_admin()) {
             return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        $studentModel = new StudentModel();
-
-        // Get students without section assignment for the specified grade level
-        $students = $studentModel->select('id, lrn, first_name, last_name')
-                                 ->where('grade_level', $gradeLevel)
-                                 ->where('enrollment_status', 'enrolled')
-                                 ->where('section_id IS NULL')
-                                 ->orderBy('last_name', 'ASC')
-                                 ->findAll();
+        $db = \Config\Database::connect();
+        
+        // Get section-specific subjects with section-specific is_active status
+        $subjects = $db->query(
+            "SELECT s.*, ss.is_active, ss.id as section_subject_id FROM subjects s
+             INNER JOIN section_subjects ss ON s.id = ss.subject_id
+             WHERE ss.section_id = ?
+             ORDER BY s.subject_name ASC",
+            [$sectionId]
+        )->getResultArray();
 
         return $this->response->setJSON([
             'success' => true,
-            'students' => $students,
-            'message' => count($students) > 0 ? null : 'No unassigned students found for Grade ' . $gradeLevel
+            'subjects' => $subjects
+        ]);
+    }
+
+    public function addSubject()
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Access denied']);
+        }
+
+        try {
+            $db = \Config\Database::connect();
+            
+            $data = [
+                'subject_code' => $this->request->getPost('subject_code'),
+                'subject_name' => $this->request->getPost('subject_name'),
+                'grade_level' => $this->request->getPost('grade_level'),
+                'is_active' => $this->request->getPost('is_active') ? 1 : 0
+            ];
+            
+            $result = $db->table('subjects')->insert($data);
+            
+            if ($result) {
+                return $this->response->setJSON(['success' => true, 'message' => 'Subject added successfully']);
+            }
+            
+            return $this->response->setJSON(['success' => false, 'error' => 'Failed to add subject']);
+        } catch (\Exception $e) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+        }
+    }
+
+    public function editSubject($id)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Access denied']);
+        }
+
+        try {
+            $db = \Config\Database::connect();
+            
+            $isActiveValue = $this->request->getPost('is_active');
+            $isActiveInt = ($isActiveValue === '1' || $isActiveValue === 1 || $isActiveValue === true || $isActiveValue === 'true') ? 1 : 0;
+            $sectionSubjectId = $this->request->getPost('section_subject_id');
+            
+            // Update section_subjects table for section-specific status
+            if ($sectionSubjectId) {
+                $result = $db->table('section_subjects')->where('id', $sectionSubjectId)->update(['is_active' => $isActiveInt]);
+            } else {
+                // Fallback: update subjects table (global)
+                $data = [
+                    'subject_code' => $this->request->getPost('subject_code'),
+                    'subject_name' => $this->request->getPost('subject_name')
+                ];
+                $result = $db->table('subjects')->where('id', $id)->update($data);
+            }
+            
+            if ($result !== false) {
+                return $this->response->setJSON(['success' => true, 'message' => 'Subject updated successfully']);
+            }
+            
+            return $this->response->setJSON(['success' => false, 'error' => 'No changes made or subject not found']);
+        } catch (\Exception $e) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+        }
+    }
+
+    public function deleteSubject($id)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Access denied']);
+        }
+
+        try {
+            $db = \Config\Database::connect();
+            
+            $result = $db->table('subjects')->where('id', $id)->delete();
+            
+            if ($result) {
+                return $this->response->setJSON(['success' => true, 'message' => 'Subject deleted successfully']);
+            }
+            
+            return $this->response->setJSON(['success' => false, 'error' => 'Subject not found or already deleted']);
+        } catch (\Exception $e) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+        }
+    }
+
+    public function getUnassignedStudents($gradeLevel)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        try {
+            $search = trim($this->request->getGet('search') ?? '');
+            $page = max(1, (int)($this->request->getGet('page') ?? 1));
+            $perPage = min(50, max(20, (int)($this->request->getGet('per_page') ?? 20)));
+
+            // Use direct SQL query like teacher controller for consistency
+            $db = \Config\Database::connect();
+            
+            $searchCondition = '';
+            $params = [$gradeLevel];
+            
+            if (!empty($search)) {
+                $searchCondition = ' AND (first_name LIKE ? OR last_name LIKE ? OR lrn LIKE ? OR CONCAT(first_name, " ", last_name) LIKE ?)';
+                $searchParam = '%' . $search . '%';
+                $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam]);
+            }
+            
+            // Get total count
+            $countQuery = "SELECT COUNT(*) as total FROM students 
+                           WHERE grade_level = ? 
+                           AND enrollment_status = 'enrolled' 
+                           AND section_id IS NULL" . $searchCondition;
+            
+            $totalResult = $db->query($countQuery, $params)->getRow();
+            $totalStudents = $totalResult->total;
+            
+            // Get paginated results
+            $offset = ($page - 1) * $perPage;
+            $perPage = (int) max(1, min(100, (int) $perPage));
+            $offset = (int) max(0, (int) $offset);
+            $dataQuery = "SELECT id, lrn, first_name, last_name, grade_level FROM students 
+                          WHERE grade_level = ? 
+                          AND enrollment_status = 'enrolled' 
+                          AND section_id IS NULL" . $searchCondition . "
+                          ORDER BY last_name ASC 
+                          LIMIT {$perPage} OFFSET {$offset}";
+            
+            $students = $db->query($dataQuery, $params)->getResultArray();
+            
+            $totalPages = max(1, ceil($totalStudents / $perPage));
+
+            return $this->response->setJSON([
+                'success' => true,
+                'students' => $students,
+                'search_term' => $search,
+                'pagination' => [
+                    'currentPage' => $page,
+                    'totalPages' => $totalPages,
+                    'totalStudents' => $totalStudents,
+                    'perPage' => $perPage
+                ]
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error in getUnassignedStudents: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error loading students: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    public function debugStudentAssignments()
+    {
+        helper('admin_access');
+        if (! function_exists('is_master_admin') || ! is_master_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+        
+        $db = \Config\Database::connect();
+        
+        // Only expose section-level data, no student PII
+        $sectionCounts = $db->query("SELECT s.id, s.section_name, s.current_enrollment, COUNT(st.id) as actual_count FROM sections s LEFT JOIN students st ON st.section_id = s.id AND st.enrollment_status = 'enrolled' WHERE s.grade_level = 1 GROUP BY s.id")->getResultArray();
+        
+        return $this->response->setJSON([
+            'section_counts' => $sectionCounts
         ]);
     }
 
     public function assignStudentsToSection($sectionId)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (!is_any_admin()) {
             return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        $studentModel = new StudentModel();
-        $sectionModel = new SectionModel();
+        try {
+            $studentModel = new StudentModel();
+            $sectionModel = new SectionModel();
+            $section = $sectionModel->find($sectionId);
+            if (!$section) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Section not found']);
+            }
 
-        // Check if section exists
-        $section = $sectionModel->find($sectionId);
-        if (!$section) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Section not found']);
-        }
+            $input = json_decode($this->request->getBody(), true);
+            $studentIds = $input['student_ids'] ?? [];
 
-        // Get student IDs from request
-        $input = json_decode($this->request->getBody(), true);
-        $studentIds = $input['student_ids'] ?? [];
+            if (empty($studentIds)) {
+                return $this->response->setJSON(['success' => false, 'message' => 'No students selected']);
+            }
 
-        if (empty($studentIds)) {
-            return $this->response->setJSON(['success' => false, 'message' => 'No students selected']);
-        }
+            // Check current enrollment and capacity
+            $currentEnrollment = $studentModel->where('section_id', $sectionId)
+                                             ->where('enrollment_status', 'enrolled')
+                                             ->countAllResults();
+            
+            $availableSlots = $section['max_capacity'] - $currentEnrollment;
+            
+            if ($availableSlots <= 0) {
+                return $this->response->setJSON([
+                    'success' => false, 
+                    'message' => "Section is at full capacity ({$currentEnrollment}/{$section['max_capacity']}). Cannot assign more students."
+                ]);
+            }
+            
+            if (count($studentIds) > $availableSlots) {
+                return $this->response->setJSON([
+                    'success' => false, 
+                    'message' => "Cannot assign " . count($studentIds) . " students. Only {$availableSlots} slots available in this section."
+                ]);
+            }
 
-        // Check section capacity
-        $currentEnrollment = $studentModel->where('section_id', $sectionId)
-                                          ->where('enrollment_status', 'enrolled')
-                                          ->countAllResults();
-        
-        $availableSlots = $section['max_capacity'] - $currentEnrollment;
-        
-        if (count($studentIds) > $availableSlots) {
-            return $this->response->setJSON([
-                'success' => false, 
-                'message' => "Section only has {$availableSlots} available slots, but you selected " . count($studentIds) . " students"
-            ]);
-        }
-
-        // Assign students to section
-        $assignedCount = 0;
-        foreach ($studentIds as $studentId) {
-            $student = $studentModel->find($studentId);
-            if ($student && empty($student['section_id'])) {
-                if ($studentModel->update($studentId, ['section_id' => $sectionId])) {
+            $assignedCount = 0;
+            $alreadyAssigned = 0;
+            $db = \Config\Database::connect();
+            
+            foreach ($studentIds as $studentId) {
+                // Use direct database query to check and update atomically, set can_view_report_card to 0 by default
+                $result = $db->query(
+                    "UPDATE students SET section_id = ?, can_view_report_card = 0, updated_at = NOW() WHERE id = ? AND (section_id IS NULL OR section_id = 0) AND enrollment_status = 'enrolled'", 
+                    [$sectionId, $studentId]
+                );
+                
+                if ($db->affectedRows() > 0) {
                     $assignedCount++;
+                } else {
+                    $alreadyAssigned++;
                 }
             }
-        }
 
-        // Update section enrollment count
-        $sectionModel->updateEnrollmentCount($sectionId);
+            // Update section enrollment count
+            $sectionModel->updateEnrollmentCount($sectionId);
 
-        if ($assignedCount > 0) {
-            return $this->response->setJSON([
-                'success' => true,
-                'message' => "Successfully assigned {$assignedCount} student(s) to {$section['section_name']}"
-            ]);
-        } else {
+            if ($assignedCount > 0) {
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => "Successfully assigned {$assignedCount} student(s) to {$section['section_name']}",
+                    'assigned_count' => $assignedCount
+                ]);
+            } else {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No students were assigned. Students may already be assigned to sections.'
+                ]);
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Error in assignStudentsToSection: ' . $e->getMessage());
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'No students were assigned. They may already be assigned to sections.'
+                'message' => 'Error assigning students: ' . $e->getMessage()
             ]);
         }
     }
 
+    public function removeStudentFromSection($studentId)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Access denied']);
+        }
+
+        $db = \Config\Database::connect();
+        $student = $db->table('students')->where('id', $studentId)->get()->getRow();
+        
+        if (!$student) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Student not found']);
+        }
+
+        // Remove student from section using raw SQL query to ensure it works
+        $db->query("UPDATE students SET section_id = NULL, updated_at = NOW() WHERE id = ?", [$studentId]);
+        
+        // Update section enrollment count if student was in a section
+        if ($student->section_id) {
+            $sectionModel = new SectionModel();
+            $sectionModel->updateEnrollmentCount($student->section_id);
+        }
+        
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Student removed from section successfully'
+        ]);
+    }
+
+    public function removeStudentsBulk()
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Access denied']);
+        }
+
+        $input = json_decode($this->request->getBody(), true);
+        $studentIds = $input['student_ids'] ?? [];
+
+        if (empty($studentIds)) {
+            return $this->response->setJSON(['success' => false, 'error' => 'No students selected']);
+        }
+
+        $db = \Config\Database::connect();
+        $sectionModel = new SectionModel();
+        $removedCount = 0;
+        $sectionsToUpdate = [];
+
+        foreach ($studentIds as $studentId) {
+            // Get current section before removing
+            $student = $db->table('students')->where('id', $studentId)->get()->getRow();
+            if ($student) {
+                if ($student->section_id) {
+                    $sectionsToUpdate[$student->section_id] = true;
+                }
+                // Use raw SQL to bypass all model restrictions
+                $db->query("UPDATE students SET section_id = NULL, updated_at = NOW() WHERE id = ?", [$studentId]);
+                $removedCount++;
+            }
+        }
+
+        // Update enrollment counts for affected sections
+        foreach (array_keys($sectionsToUpdate) as $sectionId) {
+            $sectionModel->updateEnrollmentCount($sectionId);
+        }
+
+        if ($removedCount > 0) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => "Successfully removed {$removedCount} student(s) from section"
+            ]);
+        }
+
+        return $this->response->setJSON(['success' => false, 'error' => 'Failed to remove students']);
+    }
+
     public function updateSection($sectionId)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (!is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -609,73 +859,487 @@ class Dashboard extends BaseController
 
         $rules = [
             'section_name' => 'required|max_length[100]',
-            'max_capacity' => 'required|integer|greater_than[0]'
+            'grade_level' => 'required|integer|in_list[0,1,2,3,4,5,6,7,99]',
+            'school_year' => 'required|max_length[20]',
+            'max_capacity' => 'required|integer|greater_than[0]',
+            'is_active' => 'permit_empty|in_list[0,1]'
         ];
         if (!$this->validate($rules)) {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON([
+                    'success' => false, 
+                    'message' => 'Validation failed: ' . implode(', ', $this->validator->getErrors())
+                ]);
+            }
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
         $data = [
             'section_name' => $this->request->getPost('section_name'),
+            'grade_level' => (int) $this->request->getPost('grade_level'),
+            'school_year' => $this->request->getPost('school_year'),
             'max_capacity' => (int) $this->request->getPost('max_capacity'),
             'is_active'    => $this->request->getPost('is_active') ? 1 : 0,
         ];
+        
+        // Only update grading_type if provided (for bulk edit operations)
+        $gradingType = $this->request->getPost('grading_type');
+        if ($gradingType) {
+            $data['grading_type'] = $gradingType;
+        }
 
-        // Ensure current_enrollment does not exceed new max_capacity
         if (($section['current_enrollment'] ?? 0) > $data['max_capacity']) {
             $data['current_enrollment'] = $data['max_capacity'];
         }
 
         if ($sectionModel->update($sectionId, $data)) {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['success' => true, 'message' => 'Section updated successfully']);
+            }
             return redirect()->back()->with('success', 'Section updated successfully.');
+        }
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Failed to update section']);
         }
         return redirect()->back()->with('error', 'Failed to update section.');
     }
 
+    public function deleteSection($sectionId)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        $sectionModel = new SectionModel();
+        $section = $sectionModel->find($sectionId);
+        
+        if (!$section) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Section not found']);
+        }
+
+        // Check if section has enrolled students
+        $studentModel = new StudentModel();
+        $enrolledCount = $studentModel->where('section_id', $sectionId)
+                                     ->where('enrollment_status', 'enrolled')
+                                     ->countAllResults();
+        
+        if ($enrolledCount > 0) {
+            return $this->response->setJSON([
+                'success' => false, 
+                'message' => "Cannot delete section. It has {$enrolledCount} enrolled student(s). Please move students to other sections first."
+            ]);
+        }
+
+        // Use soft delete
+        if ($sectionModel->delete($sectionId)) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Section deleted successfully'
+            ]);
+        } else {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Failed to delete section'
+            ]);
+        }
+    }
+
+    public function createSection()
+    {
+        if (!is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        if ($this->request->getMethod() !== 'POST') {
+            return redirect()->back()->with('error', 'Invalid request method.');
+        }
+
+        $rules = [
+            'section_name' => 'required|max_length[100]',
+            'grade_level' => 'required|integer|' . grade_level_in_list_rule(),
+            'school_year' => 'required|max_length[20]',
+            'grading_type' => 'permit_empty|in_list[numerical,non_numerical]',
+            'max_capacity' => 'required|integer|greater_than[0]|less_than_equal_to[50]'
+        ];
+
+        if (!$this->validate($rules)) {
+            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+        }
+
+        $sectionModel = new SectionModel();
+        
+        // Check if section name already exists for the same grade level and school year
+        $existing = $sectionModel->where('section_name', $this->request->getPost('section_name'))
+                                 ->where('grade_level', $this->request->getPost('grade_level'))
+                                 ->where('school_year', $this->request->getPost('school_year'))
+                                 ->first();
+        
+        if ($existing) {
+            return redirect()->back()->withInput()->with('error', 'A section with this name already exists for this grade level and school year.');
+        }
+
+        $gradingType = $this->request->getPost('grading_type') ?: 'numerical';
+
+        $data = [
+            'section_name' => $this->request->getPost('section_name'),
+            'grade_level' => (int) $this->request->getPost('grade_level'),
+            'school_year' => $this->request->getPost('school_year'),
+            'grading_type' => $gradingType,
+            'max_capacity' => (int) $this->request->getPost('max_capacity'),
+            'current_enrollment' => 0,
+            'is_active' => $this->request->getPost('is_active') ? 1 : 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        $sectionId = $sectionModel->insert($data);
+        
+        if ($sectionId) {
+            // If non-numerical, seed default grading symbols for this section
+            if ($gradingType === 'non_numerical') {
+                $db = \Config\Database::connect();
+                $defaultSymbols = [
+                    ['symbol' => 'P',     'label' => 'Proficient',                 'description' => 'The student consistently demonstrates the skill independently.', 'display_order' => 1],
+                    ['symbol' => 'AP',    'label' => 'Approaching Proficiency',    'description' => 'The student is developing the skill with minimal assistance.',      'display_order' => 2],
+                    ['symbol' => 'D',     'label' => 'Developing',                 'description' => 'The student is beginning to develop the skill with guidance.',     'display_order' => 3],
+                    ['symbol' => 'B',     'label' => 'Beginning',                  'description' => 'The student needs significant support to develop the skill.',   'display_order' => 4],
+                    ['symbol' => 'NO/NA', 'label' => 'Not Observed / Not Applicable', 'description' => 'The skill has not been observed or is not applicable at this time.', 'display_order' => 5],
+                ];
+                $now = date('Y-m-d H:i:s');
+                foreach ($defaultSymbols as $sym) {
+                    $sym['section_id'] = $sectionId;
+                    $sym['created_at'] = $now;
+                    $sym['updated_at'] = $now;
+                    $db->table('section_grading_symbols')->insert($sym);
+                }
+            }
+            
+            return redirect()->back()->with('success', 'Section created successfully!');
+        } else {
+            return redirect()->back()->withInput()->with('error', 'Failed to create section. Please try again.');
+        }
+    }
+
     public function analytics()
     {
-        if (!$this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        helper('school_year');
+        $currentTerm = get_current_term();
+        $schoolYear  = get_current_school_year();
+
+        $studentModel = new StudentModel();
+        $teacherModel = new TeacherModel();
+        
+        // Get gender distribution (enrolled students only — consistent with other tiles)
+        $maleCount = $studentModel->where('gender', 'Male')->where('enrollment_status', 'enrolled')->countAllResults();
+        $femaleCount = $studentModel->where('gender', 'Female')->where('enrollment_status', 'enrolled')->countAllResults();
+        
+        // Get enrollment status distribution
+        $enrolledCount = $studentModel->where('enrollment_status', 'enrolled')->countAllResults();
+        $pendingCount = $studentModel->where('enrollment_status', 'pending')->countAllResults();
+        $approvedCount = $studentModel->where('enrollment_status', 'approved')->countAllResults();
+        $rejectedCount = $studentModel->where('enrollment_status', 'rejected')->countAllResults();
+        
+        // Get enrollment by grade
+        $gradeDistribution = [];
+        foreach (grade_level_options() as $grade) {
+            $gradeDistribution[$grade] = $studentModel->where('grade_level', $grade)
+                                                   ->where('enrollment_status', 'enrolled')
+                                                   ->countAllResults();
+        }
+        
+        // Get teacher stats (active employment only)
+        $totalTeachers = $teacherModel->where('employment_status', 'active')->countAllResults();
+        $teachersWithSections = $teacherModel
+            ->where('employment_status', 'active')
+            ->where('id IN (SELECT DISTINCT adviser_id FROM sections WHERE adviser_id IS NOT NULL)', null, false)
+            ->countAllResults();
+        
+        // Get recent enrolled students
+        $recentEnrolled = $studentModel->where('enrollment_status', 'enrolled')
+                                      ->orderBy('created_at', 'DESC')
+                                      ->limit(5)
+                                      ->findAll();
+        
+        $data = [
+            'title' => 'Analytics Dashboard - CSCS SMS',
+            'currentTerm' => $currentTerm,
+            'schoolYear' => $schoolYear,
+            'genderDistribution' => [
+                'male' => $maleCount,
+                'female' => $femaleCount
+            ],
+            'statusDistribution' => [
+                'enrolled' => $enrolledCount,
+                'pending' => $pendingCount,
+                'approved' => $approvedCount,
+                'rejected' => $rejectedCount
+            ],
+            'gradeDistribution' => $gradeDistribution,
+            'teacherStats' => [
+                'active' => $totalTeachers,
+                'with_adviser' => $teachersWithSections,
+                'without_adviser' => $totalTeachers - $teachersWithSections
+            ],
+            'recentEnrolled' => $recentEnrolled,
+            'metrics' => [
+                'completionRate' => $enrolledCount > 0 ? round(($enrolledCount / ($enrolledCount + $pendingCount)) * 100) : 0,
+                'pendingRate' => $pendingCount > 0 ? round(($pendingCount / ($enrolledCount + $pendingCount)) * 100) : 0,
+                'approvalRate' => $approvedCount > 0 ? round(($approvedCount / ($enrolledCount + $pendingCount + $approvedCount)) * 100) : 0,
+                'genderBalance' => abs($maleCount - $femaleCount)
+            ],
+            'gradeAverages' => $this->getGradeAverages()
+        ];
+        
+        return view('admin/analytics', $data);
+    }
+
+    private function getGradeAverages()
+    {
+        helper('school_year');
+        $db = \Config\Database::connect();
+        $currentTerm = get_current_term();
+        $schoolYear = get_current_school_year();
+
+        $gradeAverages = [];
+        foreach (grade_level_options() as $grade) {
+            $result = $db->query(
+                "SELECT AVG(g.grade) as avg_grade 
+                 FROM grades g
+                 JOIN students s ON g.student_id = s.id
+                 WHERE s.grade_level = ? AND g.term = ? AND g.school_year = ? AND s.enrollment_status = 'enrolled'",
+                [$grade, $currentTerm, $schoolYear]
+            )->getRow();
+
+            $gradeAverages[$grade] = $result && $result->avg_grade ? round((float) $result->avg_grade, 1) : 0;
+        }
+
+        return $gradeAverages;
+    }
+
+    public function fixEnrollmentCounts()
+    {
+        if (!is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        $sectionModel = new SectionModel();
+        $studentModel = new StudentModel();
+        $sections = $sectionModel->findAll();
+        $fixed = 0;
+
+        foreach ($sections as $section) {
+            $actualCount = $studentModel->where('section_id', $section['id'])
+                                      ->where('enrollment_status', 'enrolled')
+                                      ->countAllResults();
+            
+            if ($section['current_enrollment'] != $actualCount) {
+                $sectionModel->update($section['id'], ['current_enrollment' => $actualCount]);
+                $fixed++;
+            }
+        }
+
+        return redirect()->back()->with('success', "Fixed enrollment counts for {$fixed} sections.");
+    }
+
+    public function autoAssignPreview($gradeLevel)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
+        }
+
+        $studentModel = new StudentModel();
+        $sectionModel = new SectionModel();
+
+        // Get unassigned students for this grade level, ordered by newest first
+        $students = $studentModel->where('grade_level', $gradeLevel)
+            ->where('enrollment_status', 'enrolled')
+            ->where('(section_id IS NULL OR section_id = 0)')
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
+
+        if (empty($students)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No unassigned students found for Grade ' . $gradeLevel
+            ]);
+        }
+
+        // Get active sections for this grade level with available capacity
+        $sections = $sectionModel->where('grade_level', $gradeLevel)
+            ->where('is_active', 1)
+            ->findAll();
+
+        if (empty($sections)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No active sections found for Grade ' . $gradeLevel
+            ]);
+        }
+
+        // Calculate available capacity for each section
+        $sectionsWithCapacity = [];
+        $totalAvailableSlots = 0;
+
+        foreach ($sections as $section) {
+            $availableSlots = $section['max_capacity'] - $section['current_enrollment'];
+            if ($availableSlots > 0) {
+                $sectionsWithCapacity[] = [
+                    'id' => $section['id'],
+                    'section_name' => $section['section_name'],
+                    'current_enrollment' => $section['current_enrollment'],
+                    'max_capacity' => $section['max_capacity'],
+                    'available_slots' => $availableSlots
+                ];
+                $totalAvailableSlots += $availableSlots;
+            }
+        }
+
+        if (empty($sectionsWithCapacity)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'All sections are at full capacity'
+            ]);
+        }
+
+        // Limit students to available capacity
+        if (count($students) > $totalAvailableSlots) {
+            $students = array_slice($students, 0, $totalAvailableSlots);
+        }
+
+        // Calculate proportional distribution
+        $assignments = [];
+        $totalStudents = count($students);
+        $assignedSoFar = 0;
+
+        // Sort sections by ID (first created = first filled)
+        usort($sectionsWithCapacity, function($a, $b) {
+            return $a['id'] - $b['id'];
+        });
+
+        // Fill sections sequentially
+        foreach ($sectionsWithCapacity as $section) {
+            $remainingStudents = $totalStudents - $assignedSoFar;
+            
+            if ($remainingStudents <= 0) {
+                break;
+            }
+            
+            $assignCount = min($remainingStudents, $section['available_slots']);
+
+            if ($assignCount > 0) {
+                $assignments[] = [
+                    'section_id' => $section['id'],
+                    'count' => $assignCount
+                ];
+                $assignedSoFar += $assignCount;
+            }
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'students' => $students,
+            'sections' => $sectionsWithCapacity,
+            'assignments' => $assignments
+        ]);
+    }
+
+    public function autoAssignExecute($gradeLevel)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
+        }
+
+        $studentModel = new StudentModel();
+        $sectionModel = new SectionModel();
+        $db = \Config\Database::connect();
+
+        // Get the same data as preview
+        $previewData = json_decode($this->autoAssignPreview($gradeLevel)->getBody(), true);
+        
+        if (!$previewData['success']) {
+            return $this->response->setJSON($previewData);
+        }
+
+        $students = $previewData['students'];
+        $assignments = $previewData['assignments'];
+
+        // Keep students in order (newest first, already sorted in preview)
+
+        $assignedCount = 0;
+        $studentIndex = 0;
+
+        // Assign students according to the plan
+        foreach ($assignments as $assignment) {
+            $sectionId = $assignment['section_id'];
+            $count = $assignment['count'];
+            $sectionAssigned = 0;
+
+            for ($i = 0; $i < $count && $studentIndex < count($students); $i++) {
+                $student = $students[$studentIndex];
+                
+                // Double-check student is still unassigned before updating
+                $checkResult = $db->query(
+                    "SELECT section_id FROM students WHERE id = ? AND enrollment_status = 'enrolled'",
+                    [$student['id']]
+                )->getRow();
+                
+                if ($checkResult && ($checkResult->section_id === null || $checkResult->section_id == 0)) {
+                    $result = $db->query(
+                        "UPDATE students SET section_id = ?, updated_at = NOW() WHERE id = ? AND (section_id IS NULL OR section_id = 0) AND enrollment_status = 'enrolled'",
+                        [$sectionId, $student['id']]
+                    );
+
+                    if ($db->affectedRows() > 0) {
+                        $assignedCount++;
+                        $sectionAssigned++;
+                    }
+                }
+                
+                $studentIndex++;
+            }
+
+            // Update section enrollment count
+            $sectionModel->updateEnrollmentCount($sectionId);
+        }
+
+        $totalUnassigned = $studentModel->where('grade_level', $gradeLevel)
+            ->where('enrollment_status', 'enrolled')
+            ->where('(section_id IS NULL OR section_id = 0)')
+            ->countAllResults();
+        
+        $message = "Successfully assigned {$assignedCount} students to Grade {$gradeLevel} sections";
+        if ($totalUnassigned > 0) {
+            $message .= ". {$totalUnassigned} students remain unassigned (no available capacity)";
+        }
+        
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
+
+    public function exportPdf()
+    {
+        if (!auth()->user() || !is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
         $studentModel = new StudentModel();
-        $gradeModel = new GradeModel();
         $db = \Config\Database::connect();
 
-        // Enrollment trends data (current year and previous year)
-        $enrollmentTrends = [];
-        $enrollmentTrendsPrev = [];
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        $currentYear = (int) date('Y');
-        $previousYear = $currentYear - 1;
-        
-        foreach ($months as $index => $month) {
-            $monthNum = str_pad($index + 1, 2, '0', STR_PAD_LEFT);
-            // Use enrollment_date if available, otherwise fall back to created_at
-            $dateField = $db->fieldExists('enrollment_date', 'students') ? 'enrollment_date' : 'created_at';
-            
-            $countThis = $studentModel->where("MONTH({$dateField})", $monthNum)
-                ->where("YEAR({$dateField})", $currentYear)
-                ->where('enrollment_status', 'enrolled')
-                ->countAllResults();
-            $enrollmentTrends[] = ['month' => $month, 'count' => $countThis];
-
-            $countPrev = $studentModel->where("MONTH({$dateField})", $monthNum)
-                ->where("YEAR({$dateField})", $previousYear)
-                ->where('enrollment_status', 'enrolled')
-                ->countAllResults();
-            $enrollmentTrendsPrev[] = ['month' => $month, 'count' => $countPrev];
-        }
-
-        // Gender distribution (enrolled only)
+        // Gender distribution
         $genderDistribution = [
             'male' => $studentModel->where('gender', 'Male')->where('enrollment_status', 'enrolled')->countAllResults(),
             'female' => $studentModel->where('gender', 'Female')->where('enrollment_status', 'enrolled')->countAllResults()
         ];
 
-        // Grade level distribution (enrolled only)
+        // Grade level distribution
         $gradeDistribution = [];
-        for ($grade = 7; $grade <= 12; $grade++) {
+        foreach (grade_level_options() as $grade) {
             $gradeDistribution[$grade] = $studentModel->where('grade_level', $grade)
                 ->where('enrollment_status', 'enrolled')
                 ->countAllResults();
@@ -689,176 +1353,41 @@ class Dashboard extends BaseController
             'rejected' => $studentModel->where('enrollment_status', 'rejected')->countAllResults(),
         ];
 
-        // Recent enrolled students
-        $recentEnrolled = $studentModel->where('enrollment_status', 'enrolled')
-            ->orderBy('updated_at', 'DESC')
-            ->limit(5)
-            ->findAll();
+        // Calculate metrics
+        $total = array_sum($statusDistribution);
+        $metrics = [
+            'completionRate' => $total > 0 ? round(($statusDistribution['enrolled'] / $total) * 100) : 0,
+            'pendingRate'    => $total > 0 ? round(($statusDistribution['pending'] / $total) * 100) : 0,
+            'approvalRate'   => ($statusDistribution['approved'] + $statusDistribution['pending']) > 0
+                                ? round(($statusDistribution['approved'] / ($statusDistribution['approved'] + $statusDistribution['pending'])) * 100)
+                                : 0,
+            'genderBalance'  => ($genderDistribution['male'] + $genderDistribution['female']) > 0
+                                ? abs($genderDistribution['male'] - $genderDistribution['female'])
+                                : 0,
+        ];
 
-        // Teacher statistics
+        helper('school_year');
+        $gradeAverages = [];
+        $currentTerm = get_current_term();
+        $schoolYear = get_current_school_year();
+        foreach (grade_level_options() as $grade) {
+            $result = $db->query(
+                "SELECT AVG(g.grade) as avg_grade 
+                 FROM grades g
+                 JOIN students s ON g.student_id = s.id
+                 WHERE s.grade_level = ? AND g.term = ? AND g.school_year = ? AND s.enrollment_status = 'enrolled'",
+                [$grade, $currentTerm, $schoolYear]
+            )->getRow();
+
+            $gradeAverages[$grade] = $result && $result->avg_grade ? round((float) $result->avg_grade, 1) : 0;
+        }
+
         $teacherModel = new TeacherModel();
-        $teacherStats = [
-            'active' => $teacherModel->where('employment_status', 'active')->countAllResults(),
-            'inactive' => $teacherModel->where('employment_status', 'inactive')->countAllResults(),
-            'with_adviser' => $db->query("SELECT COUNT(DISTINCT adviser_id) as count FROM sections WHERE adviser_id IS NOT NULL AND is_active = 1")->getRow()->count ?? 0
-        ];
-        $teacherStats['without_adviser'] = $teacherStats['active'] - $teacherStats['with_adviser'];
-
-        // Key Metrics
-        $total = array_sum($statusDistribution);
-        $metrics = [
-            'completionRate' => $total > 0 ? round(($statusDistribution['enrolled'] / $total) * 100) : 0,
-            'pendingRate'    => $total > 0 ? round(($statusDistribution['pending'] / $total) * 100) : 0,
-            'approvalRate'   => ($statusDistribution['approved'] + $statusDistribution['pending']) > 0
-                                ? round(($statusDistribution['approved'] / ($statusDistribution['approved'] + $statusDistribution['pending'])) * 100)
-                                : 0,
-            'genderBalance'  => ($genderDistribution['male'] + $genderDistribution['female']) > 0
-                                ? abs($genderDistribution['male'] - $genderDistribution['female'])
-                                : 0,
-        ];
-
-        // Average grade per grade level (Quarter 1 current year)
-        $gradeAverages = [7 => 0, 8 => 0, 9 => 0, 10 => 0, 11 => 0, 12 => 0];
-        try {
-            $avgRows = $db->table('grades')
-                ->select('students.grade_level as grade_level, AVG(grades.grade) as avg_grade')
-                ->join('students', 'students.id = grades.student_id', 'left')
-                ->where('grades.school_year', '2025-2026')
-                ->where('grades.quarter', 1)
-                ->where('grades.grade IS NOT NULL')
-                ->groupBy('students.grade_level')
-                ->get()
-                ->getResultArray();
-            foreach ($avgRows as $row) {
-                $gl = (int) ($row['grade_level'] ?? 0);
-                if ($gl >= 7 && $gl <= 12) {
-                    $gradeAverages[$gl] = round((float) $row['avg_grade'], 1);
-                }
-            }
-        } catch (\Throwable $e) {
-            // ignore if table not present
-        }
-
-        // Add cache busting timestamp
-        $cacheTimestamp = time();
-        
-        return view('admin/analytics', [
-            'title' => 'Analytics Dashboard - LPHS SMS',
-            'enrollmentTrends' => $enrollmentTrends,
-            'enrollmentTrendsPrev' => $enrollmentTrendsPrev,
-            'genderDistribution' => $genderDistribution,
-            'gradeDistribution' => $gradeDistribution,
-            'statusDistribution' => $statusDistribution,
-            'recentEnrolled' => $recentEnrolled,
-            'metrics' => $metrics,
-            'gradeAverages' => $gradeAverages,
-            'teacherStats' => $teacherStats,
-            'cacheTimestamp' => $cacheTimestamp,
-        ]);
-    }
-
-    /**
-     * Get student details with documents for modal display
-     */
-    public function getStudentDetails($studentId)
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
-        }
-
-        $studentModel = new StudentModel();
-        $documentModel = new EnrollmentDocumentModel();
-
-        // Get student details
-        $student = $studentModel->select('students.*, sections.section_name')
-            ->join('sections', 'sections.id = students.section_id', 'left')
-            ->find($studentId);
-
-        if (!$student) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Student not found']);
-        }
-
-        // Get student documents
-        $documents = $documentModel->where('student_id', $studentId)->findAll();
-
-        // Organize documents by type
-        $documentsByType = [];
-        foreach ($documents as $doc) {
-            $documentsByType[$doc['document_type']] = $doc;
-        }
-
-        return view('admin/partials/student_details_modal', [
-            'student' => $student,
-            'documents' => $documentsByType
-        ]);
-    }
-
-    public function exportPdf()
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
-        }
-
-        // Increase execution time for PDF generation
-        set_time_limit(120);
-        ini_set('memory_limit', '256M');
-
-        $studentModel = new StudentModel();
-        $gradeModel = new GradeModel();
-        $db = \Config\Database::connect();
-
-        // Get all analytics data
-        $genderDistribution = [
-            'male' => $studentModel->where('gender', 'Male')->where('enrollment_status', 'enrolled')->countAllResults(),
-            'female' => $studentModel->where('gender', 'Female')->where('enrollment_status', 'enrolled')->countAllResults()
-        ];
-
-        $gradeDistribution = [];
-        for ($grade = 7; $grade <= 12; $grade++) {
-            $gradeDistribution[$grade] = $studentModel->where('grade_level', $grade)
-                ->where('enrollment_status', 'enrolled')
-                ->countAllResults();
-        }
-
-        $statusDistribution = [
-            'enrolled' => $studentModel->where('enrollment_status', 'enrolled')->countAllResults(),
-            'pending'  => $studentModel->where('enrollment_status', 'pending')->countAllResults(),
-            'approved' => $studentModel->where('enrollment_status', 'approved')->countAllResults(),
-            'rejected' => $studentModel->where('enrollment_status', 'rejected')->countAllResults(),
-        ];
-
-        $total = array_sum($statusDistribution);
-        $metrics = [
-            'completionRate' => $total > 0 ? round(($statusDistribution['enrolled'] / $total) * 100) : 0,
-            'pendingRate'    => $total > 0 ? round(($statusDistribution['pending'] / $total) * 100) : 0,
-            'approvalRate'   => ($statusDistribution['approved'] + $statusDistribution['pending']) > 0
-                                ? round(($statusDistribution['approved'] / ($statusDistribution['approved'] + $statusDistribution['pending'])) * 100)
-                                : 0,
-            'genderBalance'  => ($genderDistribution['male'] + $genderDistribution['female']) > 0
-                                ? abs($genderDistribution['male'] - $genderDistribution['female'])
-                                : 0,
-        ];
-
-        $gradeAverages = [7 => 0, 8 => 0, 9 => 0, 10 => 0, 11 => 0, 12 => 0];
-        try {
-            $avgRows = $db->table('grades')
-                ->select('students.grade_level as grade_level, AVG(grades.grade) as avg_grade')
-                ->join('students', 'students.id = grades.student_id', 'left')
-                ->where('grades.school_year', '2025-2026')
-                ->where('grades.quarter', 1)
-                ->where('grades.grade IS NOT NULL')
-                ->groupBy('students.grade_level')
-                ->get()
-                ->getResultArray();
-            foreach ($avgRows as $row) {
-                $gl = (int) ($row['grade_level'] ?? 0);
-                if ($gl >= 7 && $gl <= 12) {
-                    $gradeAverages[$gl] = round((float) $row['avg_grade'], 1);
-                }
-            }
-        } catch (\Throwable $e) {
-            // ignore if table not present
-        }
+        $activeTeachers = $teacherModel->where('employment_status', 'active')->countAllResults();
+        $teachersWithSections = $teacherModel
+            ->where('employment_status', 'active')
+            ->where('id IN (SELECT DISTINCT adviser_id FROM sections WHERE adviser_id IS NOT NULL)', null, false)
+            ->countAllResults();
 
         $data = [
             'genderDistribution' => $genderDistribution,
@@ -867,496 +1396,332 @@ class Dashboard extends BaseController
             'metrics' => $metrics,
             'gradeAverages' => $gradeAverages,
             'reportDate' => date('F j, Y'),
-            'schoolYear' => '2025-2026'
+            'schoolYear' => $schoolYear,
+            'currentTerm' => $currentTerm,
+            'teacherStats' => [
+                'active' => $activeTeachers,
+                'with_adviser' => $teachersWithSections,
+                'without_adviser' => max(0, $activeTeachers - $teachersWithSections),
+            ],
         ];
 
         $html = view('admin/analytics_pdf', $data);
         
         $options = new \Dompdf\Options();
-        $options->set('defaultFont', 'Times');
-        $options->set('isRemoteEnabled', false);
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isPhpEnabled', false);
-        
+        $options->set('defaultFont', 'Helvetica');
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
         
-        $filename = 'LPHS_Analytics_Report_' . date('Y-m-d') . '.pdf';
-        $dompdf->stream($filename, ['Attachment' => false]);
+        $filename = 'CSCS_Analytics_Report_' . date('Y-m-d') . '.pdf';
+
+        return $this->sendPdfInline($dompdf, $filename);
     }
 
-    /**
-     * API endpoint for enrollment data
-     */
-    public function enrollmentData()
+    public function rebalanceGrade($gradeLevel)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+        if (!is_any_admin()) {
+            return redirect()->to(base_url('/'));
         }
 
         $studentModel = new StudentModel();
-        $db = \Config\Database::connect();
-
-        // Get enrollment data by month for the last 3 years
-        $enrollmentData = [];
-        $predictionData = [];
-        
-        for ($year = 2023; $year <= 2025; $year++) {
-            $monthly = [];
-            $yearlyTotal = 0;
-            
-            for ($month = 1; $month <= 12; $month++) {
-                $count = $studentModel->where('YEAR(created_at)', $year)
-                    ->where('MONTH(created_at)', $month)
-                    ->where('enrollment_status !=', 'rejected')
-                    ->countAllResults();
-                $monthly[] = $count;
-                $yearlyTotal += $count;
-            }
-            
-            $enrollmentData[$year] = [
-                'monthly' => $monthly,
-                'yearly' => [$yearlyTotal]
-            ];
-        }
-        
-        // Generate predictions based on historical data
-        for ($year = 2025; $year <= 2027; $year++) {
-            $baseYear = $year - 1;
-            $growthRate = 1.08; // 8% growth prediction
-            
-            $monthly = [];
-            $yearlyTotal = 0;
-            
-            if (isset($enrollmentData[$baseYear])) {
-                foreach ($enrollmentData[$baseYear]['monthly'] as $monthValue) {
-                    $predicted = round($monthValue * $growthRate);
-                    $monthly[] = $predicted;
-                    $yearlyTotal += $predicted;
-                }
-            } else {
-                // Fallback prediction
-                $monthly = [55, 63, 61, 78, 91, 98, 105, 101, 108, 115, 111, 118];
-                $yearlyTotal = array_sum($monthly);
-            }
-            
-            $predictionData[$year] = [
-                'monthly' => $monthly,
-                'yearly' => [$yearlyTotal]
-            ];
-        }
-
-        return $this->response->setJSON([
-            'enrollment' => $enrollmentData,
-            'predictions' => $predictionData
-        ]);
-    }
-
-    private function getEnrollmentDataFromDB(): array
-    {
-        $db = \Config\Database::connect();
-        
-        // Get enrollment data for multiple years
-        $enrollmentData = [];
-        
-        for ($year = 2023; $year <= 2025; $year++) {
-            $monthlyResults = $db->query("
-                SELECT 
-                    MONTH(created_at) as month,
-                    COUNT(*) as count
-                FROM students 
-                WHERE YEAR(created_at) = ?
-                AND deleted_at IS NULL
-                GROUP BY MONTH(created_at)
-                ORDER BY MONTH(created_at)
-            ", [$year])->getResultArray();
-            
-            // Initialize monthly array with zeros
-            $monthly = array_fill(0, 12, 0);
-            $yearlyTotal = 0;
-            
-            // Fill in actual counts from database
-            foreach ($monthlyResults as $result) {
-                if ($result['month'] >= 1 && $result['month'] <= 12) {
-                    $monthly[$result['month'] - 1] = (int)$result['count'];
-                    $yearlyTotal += (int)$result['count'];
-                }
-            }
-            
-            $enrollmentData[$year] = [
-                'monthly' => $monthly, 
-                'yearly' => [$yearlyTotal]
-            ];
-        }
-        
-        return $enrollmentData;
-    }
-    
-    private function getEnrollmentData(): array
-    {
-        return $this->getEnrollmentDataFromDB();
-    }
-    
-    private function generatePredictions(array $historicalData): array
-    {
-        // Get current enrolled student data as baseline
-        $currentEnrolledData = $this->getMonthlyEnrollmentData();
-        $currentTotal = array_sum($currentEnrolledData);
-        
-        // Calculate growth rate based on current enrollment trends
-        $baseGrowthRate = 0.08; // 8% annual growth (typical for growing schools)
-        
-        $predictions = [];
-        
-        // Generate predictions for 2026-2028 based on current enrollment data
-        for ($year = 2026; $year <= 2028; $year++) {
-            $yearsFromNow = $year - 2025;
-            $growthFactor = pow(1 + $baseGrowthRate, $yearsFromNow);
-            
-            // Apply growth to each month's current enrollment
-            $monthlyPredictions = [];
-            foreach ($currentEnrolledData as $monthValue) {
-                $monthlyPredictions[] = round($monthValue * $growthFactor);
-            }
-            
-            $predictions[$year] = [
-                'monthly' => $monthlyPredictions,
-                'yearly' => [array_sum($monthlyPredictions)]
-            ];
-        }
-        
-        return $predictions;
-    }
-
-    public function testAssignment($sectionId = null)
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setJSON(['error' => 'Unauthorized']);
-        }
-
         $sectionModel = new SectionModel();
-        
-        if ($sectionId) {
-            $section = $sectionModel->find($sectionId);
-            return $this->response->setJSON([
-                'section' => $section,
-                'adviser_id' => $section['adviser_id'] ?? 'NULL'
-            ]);
+        $db = \Config\Database::connect();
+
+        // Get all sections for this grade
+        $sections = $sectionModel->where('grade_level', $gradeLevel)
+            ->where('is_active', 1)
+            ->orderBy('section_name', 'ASC')
+            ->findAll();
+
+        if (empty($sections)) {
+            return redirect()->back()->with('error', 'No sections found for Grade ' . $gradeLevel);
         }
+
+        // Get all assigned students for this grade
+        $students = $studentModel->where('grade_level', $gradeLevel)
+            ->where('enrollment_status', 'enrolled')
+            ->whereIn('section_id', array_column($sections, 'id'))
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
+
+        // Clear all section assignments
+        foreach ($students as $student) {
+            $db->query("UPDATE students SET section_id = NULL WHERE id = ?", [$student['id']]);
+        }
+
+        // Redistribute evenly
+        $totalCapacity = array_sum(array_column($sections, 'max_capacity'));
+        $studentCount = count($students);
+        $studentIndex = 0;
+
+        foreach ($sections as $section) {
+            $proportion = $section['max_capacity'] / $totalCapacity;
+            $assignCount = min(
+                (int) round($studentCount * $proportion),
+                $section['max_capacity'],
+                $studentCount - $studentIndex
+            );
+
+            for ($i = 0; $i < $assignCount && $studentIndex < $studentCount; $i++) {
+                $db->query(
+                    "UPDATE students SET section_id = ?, updated_at = NOW() WHERE id = ?",
+                    [$section['id'], $students[$studentIndex]['id']]
+                );
+                $studentIndex++;
+            }
+
+            $sectionModel->updateEnrollmentCount($section['id']);
+        }
+
+        return redirect()->back()->with('success', "Rebalanced {$studentIndex} students across Grade {$gradeLevel} sections");
+    }
+
+    public function fixSectionSchoolYears()
+    {
+        if (!auth()->user() || !is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        $db = \Config\Database::connect();
+        $currentSchoolYear = get_current_school_year();
         
-        $sections = $sectionModel->select('id, section_name, adviser_id')
-                                ->where('adviser_id IS NOT NULL')
-                                ->findAll();
+        $result = $db->query("UPDATE sections SET school_year = ? WHERE deleted_at IS NULL", [$currentSchoolYear]);
+        $affectedRows = $db->affectedRows();
         
+        return redirect()->to('admin/sections')->with('success', "Updated {$affectedRows} sections to school year {$currentSchoolYear}");
+    }
+
+    public function assignSubjectsToSection()
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        $input = json_decode($this->request->getBody(), true);
+        $sectionId = $input['section_id'] ?? null;
+        $subjectIds = $input['subject_ids'] ?? [];
+
+        if (!$sectionId || empty($subjectIds)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Invalid data']);
+        }
+
+        $db = \Config\Database::connect();
+        $added = 0;
+
+        foreach ($subjectIds as $subjectId) {
+            // Check if already assigned
+            $exists = $db->table('section_subjects')
+                ->where('section_id', $sectionId)
+                ->where('subject_id', $subjectId)
+                ->countAllResults();
+            
+            if ($exists == 0) {
+                $db->table('section_subjects')->insert([
+                    'section_id' => $sectionId,
+                    'subject_id' => $subjectId
+                ]);
+                $added++;
+            }
+        }
+
         return $this->response->setJSON([
-            'sections_with_advisers' => $sections,
-            'count' => count($sections)
+            'success' => true,
+            'message' => "{$added} subject(s) assigned to section"
         ]);
     }
 
-    public function updateQuarter()
+    public function getAllTeachers()
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        $quarter = $this->request->getPost('quarter');
-        if (!in_array($quarter, [1, 2, 3, 4])) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Invalid quarter']);
-        }
+        $teacherModel = new TeacherModel();
+        $teachers = $teacherModel->where('employment_status', 'active')
+            ->orderBy('last_name', 'ASC')
+            ->findAll();
 
-        $systemSettingModel = new \App\Models\SystemSettingModel();
-        if ($systemSettingModel->setCurrentQuarter($quarter)) {
-            return $this->response->setJSON(['success' => true, 'message' => 'Quarter updated successfully']);
-        }
-
-        return $this->response->setJSON(['success' => false, 'message' => 'Failed to update quarter']);
+        return $this->response->setJSON([
+            'success' => true,
+            'teachers' => $teachers
+        ]);
     }
 
-    public function createAdmin()
+    public function getSubjectAssignments($sectionId)
     {
-        // Enhanced authorization check
-        if (!$this->auth->user()->inGroup('admin')) {
-            log_message('warning', 'Unauthorized admin creation attempt from user ID: ' . ($this->auth->id() ?? 'unknown'));
-            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        // CSRF protection
-        if (!$this->request->is('post') || !$this->validate(['csrf_token' => 'required'])) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Invalid request']);
-        }
-
-        // Rate limiting check (max 3 admin creations per hour per user)
-        $cache = \Config\Services::cache();
-        $rateLimitKey = 'admin_creation_' . $this->auth->id();
-        $attempts = $cache->get($rateLimitKey) ?? 0;
+        $db = \Config\Database::connect();
         
-        if ($attempts >= 3) {
-            log_message('warning', 'Rate limit exceeded for admin creation by user ID: ' . $this->auth->id());
-            return $this->response->setJSON(['success' => false, 'message' => 'Too many admin creation attempts. Try again later.']);
+        $assignments = $db->query(
+            "SELECT ts.id as schedule_id, ts.teacher_id, ts.subject_id, 
+                    CONCAT(t.first_name, ' ', t.last_name) as teacher_name,
+                    s.subject_name, s.subject_code
+             FROM teacher_schedules ts
+             JOIN teachers t ON t.id = ts.teacher_id
+             JOIN subjects s ON s.id = ts.subject_id
+             WHERE ts.section_id = ?",
+            [$sectionId]
+        )->getResultArray();
+
+        return $this->response->setJSON([
+            'success' => true,
+            'assignments' => $assignments
+        ]);
+    }
+
+    public function assignSubjectTeacher()
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        // Enhanced validation rules
-        $rules = [
-            'email' => 'required|valid_email|is_unique[auth_identities.secret]',
-            'first_name' => 'required|min_length[2]|max_length[50]|alpha_space',
-            'last_name' => 'required|min_length[2]|max_length[50]|alpha_space',
-            'password' => 'required|min_length[12]|regex_match[/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/]',
-            'confirm_password' => 'required|matches[password]'
+        $teacherId = $this->request->getPost('teacher_id');
+        $sectionId = $this->request->getPost('section_id');
+        $subjectId = $this->request->getPost('subject_id');
+
+        if (!$teacherId || !$sectionId || !$subjectId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Teacher, section, and subject are required']);
+        }
+
+        $db = \Config\Database::connect();
+        $schoolYear = get_current_school_year();
+
+        // Check if teacher already assigned to this subject in this section
+        $exists = $db->table('teacher_schedules')
+            ->where('teacher_id', $teacherId)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->countAllResults();
+
+        if ($exists > 0) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Teacher already assigned to this subject']);
+        }
+
+        $data = [
+            'teacher_id' => $teacherId,
+            'section_id' => $sectionId,
+            'subject_id' => $subjectId,
+            'day_of_week' => 'Monday',
+            'start_time' => '07:00:00',
+            'end_time' => '08:00:00',
+            'room' => '',
+            'school_year' => $schoolYear,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
         ];
 
-        if (!$this->validate($rules)) {
-            $cache->save($rateLimitKey, $attempts + 1, 3600); // 1 hour
-            return $this->response->setJSON(['success' => false, 'message' => 'Validation failed. Password must be 12+ chars with uppercase, lowercase, number, and special character.']);
+        if ($db->table('teacher_schedules')->insert($data)) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Teacher assigned successfully']);
         }
 
-        try {
-            $db = \Config\Database::connect();
-            $users = model(\CodeIgniter\Shield\Models\UserModel::class);
-            
-            $email = $this->request->getPost('email');
-            $firstName = $this->request->getPost('first_name');
-            $lastName = $this->request->getPost('last_name');
-            
-            // Create user entity with inactive status for verification
-            $user = new \CodeIgniter\Shield\Entities\User([
-                'email' => $email,
-                'password' => $this->request->getPost('password'),
-                'active' => 0 // Require activation
-            ]);
-
-            $users->save($user);
-            $userId = $users->getInsertID();
-            
-            if ($userId) {
-                // Add to admin group
-                $db->table('auth_groups_users')->ignore(true)->insert([
-                    'user_id' => $userId,
-                    'group' => 'admin',
-                    'created_at' => date('Y-m-d H:i:s'),
-                ]);
-                
-                // Log successful admin creation
-                log_message('info', 'Admin account created successfully. Email: ' . $email . ' by user ID: ' . $this->auth->id());
-                
-                // Clear rate limit on success
-                $cache->delete($rateLimitKey);
-                
-                return $this->response->setJSON([
-                    'success' => true, 
-                    'message' => 'Admin account created. Account requires activation before use. Email: ' . $email
-                ]);
-            }
-        } catch (\Exception $e) {
-            // Log error without exposing sensitive details
-            log_message('error', 'Admin creation failed for email: ' . ($this->request->getPost('email') ?? 'unknown') . ' Error: ' . $e->getMessage());
-            $cache->save($rateLimitKey, $attempts + 1, 3600);
-            return $this->response->setJSON(['success' => false, 'message' => 'Failed to create admin account. Please try again.']);
-        }
-
-        return $this->response->setJSON(['success' => false, 'message' => 'Failed to create admin account']);
+        return $this->response->setJSON(['success' => false, 'message' => 'Failed to assign teacher']);
     }
-
-    /**
-     * Debug method to check enrollment data by month
-     */
-    public function debugEnrollmentData()
+    
+    public function assignSubjectTeacherOnly()
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setJSON(['error' => 'Unauthorized']);
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
+        $teacherId = $this->request->getPost('teacher_id');
+        $sectionId = $this->request->getPost('section_id');
+        $subjectId = $this->request->getPost('subject_id');
+
+        if (!$teacherId || !$sectionId || !$subjectId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Teacher, section, and subject are required']);
+        }
+
+        $db = \Config\Database::connect();
+        $schoolYear = get_current_school_year();
+
+        // Check if assignment already exists
+        $exists = $db->table('teacher_schedules')
+            ->where('teacher_id', $teacherId)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->countAllResults();
+
+        if ($exists > 0) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Teacher already assigned to this subject']);
+        }
+
+        // Create a placeholder schedule entry with default values
+        $data = [
+            'teacher_id' => $teacherId,
+            'section_id' => $sectionId,
+            'subject_id' => $subjectId,
+            'day_of_week' => 'TBD',
+            'start_time' => '00:00:00',
+            'end_time' => '00:00:00',
+            'room' => '',
+            'school_year' => $schoolYear,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        if ($db->table('teacher_schedules')->insert($data)) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Teacher assigned successfully']);
+        }
+
+        return $this->response->setJSON(['success' => false, 'message' => 'Failed to assign teacher']);
+    }
+    
+    public function getGradeSections($gradeLevel)
+    {
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+        
+        $sectionModel = new SectionModel();
         $studentModel = new StudentModel();
-        $db = \Config\Database::connect();
         
-        // Get enrollment data by month for 2024
-        $monthlyData = [];
-        for ($month = 1; $month <= 12; $month++) {
-            $count = $studentModel->where('YEAR(created_at)', 2024)
-                ->where('MONTH(created_at)', $month)
-                ->countAllResults();
-            $monthlyData[] = [
-                'month' => $month,
-                'month_name' => date('F', mktime(0, 0, 0, $month, 1)),
-                'count' => $count
-            ];
-        }
-        
-        // Get sample student records
-        $sampleStudents = $db->query("
-            SELECT id, first_name, last_name, created_at, enrollment_status 
-            FROM students 
-            WHERE deleted_at IS NULL 
-            ORDER BY created_at DESC 
-            LIMIT 20
-        ")->getResultArray();
-        
-        return $this->response->setJSON([
-            'monthly_data_2024' => $monthlyData,
-            'sample_students' => $sampleStudents,
-            'total_students' => $studentModel->countAllResults()
-        ]);
-    }
-
-    /**
-     * Get monthly enrollment data for enrolled students chart
-     */
-    private function getMonthlyEnrollmentData(): array
-    {
-        $db = \Config\Database::connect();
-        
-        // Get students enrolled before today (for scattering)
-        $oldStudents = $db->query("
-            SELECT COUNT(*) as count 
-            FROM students 
-            WHERE DATE(created_at) < CURDATE()
-            AND enrollment_status = 'enrolled'
-            AND deleted_at IS NULL
-        ")->getRow()->count ?? 0;
-        
-        // Get students enrolled today and onwards (real data)
-        $newStudents = $db->query("
-            SELECT MONTH(created_at) as month, COUNT(*) as count 
-            FROM students 
-            WHERE DATE(created_at) >= CURDATE()
-            AND enrollment_status = 'enrolled'
-            AND deleted_at IS NULL
-            GROUP BY MONTH(created_at)
-        ")->getResultArray();
-        
-        // Philippine enrollment distribution pattern (Jan-Oct only, Nov-Dec = 0)
-        $distribution = [0.03, 0.02, 0.02, 0.07, 0.20, 0.45, 0.15, 0.04, 0.02, 0.00, 0.00, 0.00];
-        
-        $monthlyData = [];
-        for ($month = 1; $month <= 12; $month++) {
-            if ($month <= 10) {
-                // Scatter old data across Jan-Oct only
-                $count = (int)round($oldStudents * $distribution[$month - 1]);
-            } else {
-                // Nov-Dec start with 0 (no scattered data)
-                $count = 0;
-            }
-            
-            // Add real new enrollments for this month
-            foreach ($newStudents as $newStudent) {
-                if ($newStudent['month'] == $month) {
-                    $count += (int)$newStudent['count'];
-                }
-            }
-            
-            $monthlyData[] = $count;
-        }
-        
-        return $monthlyData;
-    }
-
-    /**
-     * Debug method to check enrollment status distribution
-     */
-    public function debugEnrollmentStatus()
-    {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setJSON(['error' => 'Unauthorized']);
-        }
-
-        $studentModel = new StudentModel();
-        $db = \Config\Database::connect();
-        
-        // Get raw counts from database
-        $statusCounts = $db->query("
-            SELECT enrollment_status, COUNT(*) as count 
-            FROM students 
-            WHERE deleted_at IS NULL 
-            GROUP BY enrollment_status
-        ")->getResultArray();
-        
-        // Get recent rejected students
-        $recentRejected = $studentModel->where('enrollment_status', 'rejected')
-            ->orderBy('updated_at', 'DESC')
-            ->limit(10)
+        $sections = $sectionModel->where('grade_level', $gradeLevel)
+            ->where('is_active', 1)
+            ->orderBy('section_name', 'ASC')
             ->findAll();
         
+        // Add current enrollment count to each section
+        foreach ($sections as &$section) {
+            $section['current_enrollment'] = $studentModel->where('section_id', $section['id'])
+                ->where('enrollment_status', 'enrolled')
+                ->countAllResults();
+        }
+        
         return $this->response->setJSON([
-            'status_counts' => $statusCounts,
-            'recent_rejected' => $recentRejected,
-            'total_students' => $studentModel->countAllResults()
+            'success' => true,
+            'sections' => $sections
         ]);
     }
-
-    /**
-     * Debug and fix student section assignments
-     */
-    public function fixStudentSections()
+    
+    public function getSectionCapacityInfo($sectionId)
     {
-        if (!$this->auth->user()->inGroup('admin')) {
-            return $this->response->setJSON(['error' => 'Unauthorized']);
-        }
-
-        $db = \Config\Database::connect();
-        
-        // Find and remove the incorrectly named "Grade 10 - Aristotle" section
-        $wrongSection = $db->query("
-            SELECT id, section_name FROM sections 
-            WHERE section_name = 'Grade 10 - Aristotle'
-        ")->getRowArray();
-        
-        // Find the correct Aristotle section
-        $correctSection = $db->query("
-            SELECT id, section_name FROM sections 
-            WHERE section_name = 'Aristotle'
-        ")->getRowArray();
-        
-        $moved = 0;
-        $deleted = 0;
-        
-        if ($wrongSection && $correctSection) {
-            // Move students from wrong section to correct section
-            $result = $db->query("
-                UPDATE students 
-                SET section_id = ? 
-                WHERE section_id = ?
-            ", [$correctSection['id'], $wrongSection['id']]);
-            
-            if ($result) {
-                $moved = $db->affectedRows();
-            }
-            
-            // Delete the incorrectly named section
-            $deleteResult = $db->query("
-                DELETE FROM sections WHERE id = ?
-            ", [$wrongSection['id']]);
-            
-            if ($deleteResult) {
-                $deleted = 1;
-            }
+        if (!is_any_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
         
-        // Also fix Grade 10 students in Aphrodite section
-        $aphroditeSection = $db->query("
-            SELECT id FROM sections WHERE section_name = 'Aphrodite'
-        ")->getRowArray();
+        $sectionModel = new SectionModel();
+        $studentModel = new StudentModel();
         
-        $fixedAphrodite = 0;
-        if ($correctSection && $aphroditeSection) {
-            $result = $db->query("
-                UPDATE students 
-                SET section_id = ? 
-                WHERE (grade_level = 10 OR lrn LIKE 'DEMO-STUDENT-%') 
-                AND section_id = ?
-            ", [$correctSection['id'], $aphroditeSection['id']]);
-            
-            if ($result) {
-                $fixedAphrodite = $db->affectedRows();
-            }
+        $section = $sectionModel->find($sectionId);
+        if (!$section) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Section not found']);
         }
+        
+        $currentEnrollment = $studentModel->where('section_id', $sectionId)
+            ->where('enrollment_status', 'enrolled')
+            ->countAllResults();
+        
+        $section['current_enrollment'] = $currentEnrollment;
         
         return $this->response->setJSON([
-            'moved_from_wrong_section' => $moved,
-            'deleted_sections' => $deleted,
-            'fixed_from_aphrodite' => $fixedAphrodite,
-            'message' => "Moved {$moved} students from wrong section, deleted {$deleted} incorrect section, fixed {$fixedAphrodite} from Aphrodite"
+            'success' => true,
+            'section' => $section
         ]);
     }
 }
+

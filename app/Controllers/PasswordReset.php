@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use App\Models\StudentModel;
 use App\Models\TeacherModel;
+use App\Models\PasswordResetRequestModel;
 use CodeIgniter\Shield\Models\UserModel;
 
 class PasswordReset extends BaseController
@@ -12,7 +12,7 @@ class PasswordReset extends BaseController
     public function index()
     {
         return view('auth/forgot_password', [
-            'title' => 'Reset Password - LPHS SMS'
+            'title' => 'Reset Password - CSCS SMS'
         ]);
     }
 
@@ -41,8 +41,25 @@ class PasswordReset extends BaseController
             // Check students
             $student = $studentModel->where('lrn', $identifier)->first();
             if ($student) {
-                $user = $userModel->find($student['user_id']);
-                $userType = 'student';
+                if ($student['user_id']) {
+                    $user = $userModel->find($student['user_id']);
+                    $userType = 'student';
+                } else {
+                    // Student exists but no user account - create one
+                    $userData = [
+                        'email' => $student['email'] ?: $student['lrn'] . '@student.lphs.edu',
+                        'password' => 'temp123',
+                        'active' => 1
+                    ];
+                    
+                    $userId = $userModel->insert($userData);
+                    if ($userId) {
+                        // Update student with user_id
+                        $studentModel->update($student['id'], ['user_id' => $userId]);
+                        $user = $userModel->find($userId);
+                        $userType = 'student';
+                    }
+                }
             }
         }
         
@@ -59,23 +76,43 @@ class PasswordReset extends BaseController
         }
         
         if (!$userId) {
-            return redirect()->back()->with('error', 'Invalid user data found.');
+            return redirect()->back()->with('error', 'Unable to process password reset request.');
         }
 
         // Create password reset request
-        $db = \Config\Database::connect();
+        $resetRequestModel = new PasswordResetRequestModel();
         $token = bin2hex(random_bytes(32));
         
+        // Get user email - prioritize student/teacher email over auth_identities
+        $userEmail = null;
+        
+        if ($userType === 'student' && $student) {
+            $userEmail = $student['email'] ?: $identifier . '@student.lphs.edu';
+        } elseif ($userType === 'teacher' && $teacher) {
+            $userEmail = $teacher['email'] ?: $identifier . '@teacher.lphs.edu';
+        }
+        
+        if (!$userEmail) {
+            // Try to get email from auth_identities
+            $db = \Config\Database::connect();
+            $identity = $db->table('auth_identities')
+                ->where('user_id', $userId)
+                ->where('type', 'email_password')
+                ->get()
+                ->getRowArray();
+            $userEmail = $identity['secret'] ?? $identifier . '@student.lphs.edu';
+        }
+        
         $resetData = [
-            'identifier' => $identifier,
             'user_id' => $userId,
+            'email' => $userEmail,
             'token' => $token,
             'status' => 'pending',
-            'requested_at' => date('Y-m-d H:i:s'),
-            'expires_at' => date('Y-m-d H:i:s', strtotime('+24 hours'))
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+24 hours')),
+            'created_at' => date('Y-m-d H:i:s')
         ];
 
-        $db->table('password_resets')->insert($resetData);
+        $resetRequestModel->insert($resetData);
 
         return redirect()->to(base_url('forgot-password'))->with('success', 'Password reset request submitted. Please wait for admin approval.');
     }
@@ -133,15 +170,6 @@ class PasswordReset extends BaseController
 
             log_message('info', 'Found reset request for user ID: ' . $reset['user_id']);
 
-            // Update user password using Shield's proper method
-            $userModel = new UserModel();
-            $user = $userModel->find($reset['user_id']);
-            
-            if (!$user) {
-                log_message('error', 'User not found for ID: ' . $reset['user_id']);
-                return redirect()->back()->with('error', 'User not found.');
-            }
-
             // Update password directly in auth_identities table
             $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
             
@@ -153,42 +181,21 @@ class PasswordReset extends BaseController
                 ->getRowArray();
             
             if ($existingIdentity) {
-                // Update existing password identity - only update the password hash in secret2
-                log_message('info', 'Existing identity found for user: ' . $reset['user_id'] . ', current secret2: ' . substr($existingIdentity['secret2'], 0, 20) . '...');
-                log_message('info', 'New password hash: ' . substr($hashedPassword, 0, 20) . '...');
-                
-                $updated = $db->table('auth_identities')
+                // Update existing password
+                $saved = $db->table('auth_identities')
                     ->where('user_id', $reset['user_id'])
                     ->where('type', 'email_password')
                     ->update([
                         'secret2' => $hashedPassword,
                         'updated_at' => date('Y-m-d H:i:s')
                     ]);
-                
-                log_message('info', 'Update query affected rows: ' . $updated);
-                
-                // Verify the update
-                $verifyUpdate = $db->table('auth_identities')
-                    ->where('user_id', $reset['user_id'])
-                    ->where('type', 'email_password')
-                    ->get()
-                    ->getRowArray();
-                
-                log_message('info', 'After update, secret2: ' . substr($verifyUpdate['secret2'], 0, 20) . '...');
-                
-                $saved = $updated > 0;
-                log_message('info', 'Updated existing auth_identity password for user: ' . $reset['user_id'] . ', success: ' . ($saved ? 'true' : 'false'));
             } else {
-                // Create new password identity - use the email from password reset identifier lookup
-                $userEmail = 'sofia.aguilar@lphs.edu'; // Default for this specific case
-                
-                // Try to get email from users table first
+                // Get user email for new identity
                 $userRecord = $db->table('users')->where('id', $reset['user_id'])->get()->getRowArray();
-                if ($userRecord && !empty($userRecord['email'])) {
-                    $userEmail = $userRecord['email'];
-                }
+                $userEmail = $userRecord['email'] ?? $reset['identifier'] . '@student.lphs.edu';
                 
-                $inserted = $db->table('auth_identities')->insert([
+                // Create new auth identity
+                $saved = $db->table('auth_identities')->insert([
                     'user_id' => $reset['user_id'],
                     'type' => 'email_password',
                     'name' => '',
@@ -201,8 +208,6 @@ class PasswordReset extends BaseController
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ]);
-                $saved = $inserted;
-                log_message('info', 'Created new auth_identity for user: ' . $reset['user_id'] . ' with email: ' . $userEmail);
             }
             
             if (!$saved) {
@@ -216,7 +221,6 @@ class PasswordReset extends BaseController
                 'status' => 'used'
             ]);
 
-            log_message('info', 'Password successfully changed for user ID: ' . $reset['user_id']);
             return redirect()->to('admin/password-resets')->with('success', 'Password changed successfully! The user can now login with their new password.');
             
         } catch (\Exception $e) {
@@ -240,25 +244,14 @@ class PasswordReset extends BaseController
         }
         
         return view('admin/password_reset_change', [
-            'title' => 'Change Password - LPHS SMS',
+            'title' => 'Change Password - CSCS SMS',
             'reset' => $reset
         ]);
     }
 
     public function adminList()
     {
-        $db = \Config\Database::connect();
-        $resets = $db->table('password_resets pr')
-            ->select('pr.*, u.email')
-            ->join('users u', 'u.id = pr.user_id')
-            ->where('pr.status', 'pending')
-            ->orderBy('pr.requested_at', 'DESC')
-            ->get()
-            ->getResultArray();
-
-        return view('admin/password_resets', [
-            'title' => 'Password Reset Requests - LPHS SMS',
-            'resets' => $resets
-        ]);
+        // Redirect to the new admin password resets page
+        return redirect()->to('admin/password-resets');
     }
 }

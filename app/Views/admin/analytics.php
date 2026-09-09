@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 <!-- Prevent caching of analytics data -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -188,15 +188,14 @@
       </div>
 
       <div class="card">
-        <div class="card-header py-2"><strong class="small">Average Grade (Q1)</strong></div>
+        <div class="card-header py-2">
+          <strong class="small">Average Grade (T<?= esc((string) ($currentTerm ?? get_current_term())) ?>)</strong>
+        </div>
         <div class="card-body py-2">
-          <div class="metric-row"><span>Grade 7</span><strong><?= esc($gradeAverages[7] ?? 0) ?></strong></div>
-          <div class="metric-row"><span>Grade 8</span><strong><?= esc($gradeAverages[8] ?? 0) ?></strong></div>
-          <div class="metric-row"><span>Grade 9</span><strong><?= esc($gradeAverages[9] ?? 0) ?></strong></div>
-          <div class="metric-row"><span>Grade 10</span><strong><?= esc($gradeAverages[10] ?? 0) ?></strong></div>
-          <div class="metric-row"><span>Grade 11</span><strong><?= esc($gradeAverages[11] ?? 0) ?></strong></div>
-          <div class="metric-row mb-0"><span>Grade 12</span><strong><?= esc($gradeAverages[12] ?? 0) ?></strong></div>
-          <small class="text-muted d-block mt-1 small">SY: 2024-2025</small>
+          <?php foreach (grade_level_options() as $g): ?>
+          <div class="metric-row<?= $g === grade_level_max() ? ' mb-0' : '' ?>"><span><?= esc(grade_level_label($g)) ?></span><strong><?= esc($gradeAverages[$g] ?? 0) ?></strong></div>
+          <?php endforeach; ?>
+          <small class="text-muted d-block mt-1 small">SY: <?= esc($schoolYear ?? get_current_school_year()) ?></small>
         </div>
       </div>
     </div>
@@ -210,69 +209,31 @@ const colorPrimary = css.getPropertyValue('--color-primary').trim() || '#1e40af'
 const colorPrimaryLight = css.getPropertyValue('--color-primary-light').trim() || '#3b82f6';
 const colorHeading = css.getPropertyValue('--color-heading').trim() || '#0f172a';
 
-const trendData = <?= json_encode($enrollmentTrends ?? []) ?>;
-const trendPrev = <?= json_encode($enrollmentTrendsPrev ?? []) ?>;
-const trendLabels = trendData.map(x => x.month);
-const trendCounts = trendData.map(x => x.count);
-const trendPrevCounts = trendPrev.map(x => x.count);
-
 const genderData = <?= json_encode($genderDistribution ?? []) ?>;
-const gradeData = <?= json_encode($gradeDistribution ?? []) ?>;
 const statusData = <?= json_encode($statusDistribution ?? []) ?>;
 const teacherData = <?= json_encode($teacherStats ?? []) ?>;
 
-
+document.addEventListener('DOMContentLoaded', function () {
+const chartDefaults = { responsive: true, maintainAspectRatio: false };
 
 // Grade Bar (modern blue palette)
-new Chart(document.getElementById('gradeChart'), { type: 'bar', data: { labels: ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'], datasets: [{ data: [gradeData['7'] ?? 0, gradeData['8'] ?? 0, gradeData['9'] ?? 0, gradeData['10'] ?? 0, gradeData['11'] ?? 0, gradeData['12'] ?? 0], backgroundColor: [colorPrimary, colorPrimaryLight, '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'], borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(15,23,42,0.06)' }, ticks: { stepSize: 1, color: colorHeading, maxTicksLimit: 4 } }, x: { grid: { display: false }, ticks: { color: colorHeading } } }, plugins: { legend: { display: false } } } });
+const gradeEl = document.getElementById('gradeChart');
+if (gradeEl) new Chart(gradeEl, { type: 'bar', data: { labels: <?= json_encode(grade_level_chart_labels()) ?>, datasets: [{ data: <?= json_encode(array_map(static fn (int $g): int => (int) ($gradeDistribution[$g] ?? $gradeDistribution[(string) $g] ?? 0), grade_level_options())) ?>, backgroundColor: ['#7c3aed', colorPrimary, colorPrimaryLight, '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'], borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(15,23,42,0.06)' }, ticks: { stepSize: 1, color: colorHeading, maxTicksLimit: 4 } }, x: { grid: { display: false }, ticks: { color: colorHeading } } }, plugins: { legend: { display: false } } } });
 
 // Teacher Doughnut (orange shades)
-new Chart(document.getElementById('teacherChart'), { type: 'doughnut', data: { labels: ['With Sections','Available'], datasets: [{ data: [teacherData.with_adviser ?? 0, teacherData.without_adviser ?? 0], backgroundColor: ['#f59e0b', '#fbbf24'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
+const teacherEl = document.getElementById('teacherChart');
+if (teacherEl) new Chart(teacherEl, { type: 'doughnut', data: { labels: ['With Sections','Available'], datasets: [{ data: [teacherData.with_adviser ?? 0, teacherData.without_adviser ?? 0], backgroundColor: ['#f59e0b', '#fbbf24'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
 
 // Gender Doughnut (blue shades)
-new Chart(document.getElementById('genderChart'), { type: 'doughnut', data: { labels: ['Male','Female'], datasets: [{ data: [genderData.male ?? 0, genderData.female ?? 0], backgroundColor: [colorPrimary, colorPrimaryLight], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
+const genderEl = document.getElementById('genderChart');
+if (genderEl) new Chart(genderEl, { type: 'doughnut', data: { labels: ['Male','Female'], datasets: [{ data: [genderData.male ?? 0, genderData.female ?? 0], backgroundColor: [colorPrimary, colorPrimaryLight], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
 
 
 
 // Enrollment Status (doughnut)
-new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['Enrolled','Pending','Approved','Rejected'], datasets: [{ data: [statusData.enrolled ?? 0, statusData.pending ?? 0, statusData.approved ?? 0, statusData.rejected ?? 0], backgroundColor: [colorPrimary, colorPrimaryLight, '#60a5fa', '#94a3b8'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
+const statusEl = document.getElementById('statusChart');
+if (statusEl) new Chart(statusEl, { type: 'doughnut', data: { labels: ['Enrolled','Pending','Approved','Rejected'], datasets: [{ data: [statusData.enrolled ?? 0, statusData.pending ?? 0, statusData.approved ?? 0, statusData.rejected ?? 0], backgroundColor: [colorPrimary, colorPrimaryLight, '#60a5fa', '#94a3b8'], borderWidth: 0 }] },   options: { ...chartDefaults, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: colorHeading, boxWidth: 10 } } } } });
 
-// Year change function for enrolled students
-let trendChart;
-function changeYear(year) {
-  // Update button states
-  document.querySelectorAll('.btn-group button').forEach(btn => {
-    btn.classList.remove('btn-primary');
-    btn.classList.add('btn-outline-primary');
-  });
-  event.target.classList.remove('btn-outline-primary');
-  event.target.classList.add('btn-primary');
-  
-  // Database-connected data for different years
-  const yearData = {
-    2023: [2, 1, 0, 1, 2, 1, 3, 2, 1, 0, 1, 2],
-    2024: trendCounts, // Current year from database
-    2025: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] // Future year (empty)
-  };
-  
-  // Update chart data
-  if (trendChart) {
-    trendChart.data.datasets[0].data = yearData[year] || trendCounts;
-    trendChart.data.datasets[0].label = year.toString();
-    trendChart.update();
-  }
-}
-
-// Store reference to trend chart
-trendChart = new Chart(document.getElementById('trendChart'), {
-  type: 'line',
-  data: {
-    labels: trendLabels,
-    datasets: [
-      { label: '<?= date('Y') ?>', data: trendCounts, borderColor: colorPrimary, backgroundColor: 'rgba(30, 64, 175, 0.15)', tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 3 }
-    ]
-  },
-  options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(15,23,42,0.06)' } }, x: { grid: { display: false } } }, plugins: { legend: { labels: { color: colorHeading, boxWidth: 10, usePointStyle: true } } } }
 });
 </script>
 <?= $this->endSection() ?> 

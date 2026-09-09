@@ -2,100 +2,117 @@
 <?= $this->section('content') ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">My Schedule</h1>
-    <?php if ($teacher): ?>
-        <span class="text-muted"><?= esc($teacher['first_name'] . ' ' . $teacher['last_name']) ?></span>
-    <?php endif; ?>
+    <div>
+        <h1 class="h4 mb-0">Manage Schedule</h1>
+        <?php if ($teacher): ?>
+            <p class="text-muted mb-0"><?= esc($teacher['first_name'] . ' ' . $teacher['last_name']) ?></p>
+        <?php endif; ?>
+    </div>
+    <a href="<?= base_url('teacher/dashboard') ?>" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+    </a>
 </div>
 
-<?php if (!empty($schedules)): ?>
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">Weekly Teaching Schedule</h5>
-        </div>
-        <div class="card-body">
-            <!-- Schedule List -->
-            <div id="scheduleList">
-                        <?php 
-                        // Get all unique time slots from existing schedules
-                        $existingTimeSlots = [];
-                        foreach ($schedules as $schedule) {
-                            $timeKey = date('H:i', strtotime($schedule['start_time'])) . '-' . date('H:i', strtotime($schedule['end_time']));
-                            $existingTimeSlots[$timeKey] = true;
-                        }
-                        
-                        // Default time slots
-                        $defaultTimeSlots = [
-                            '07:00-08:00', '08:00-09:00', '09:00-10:00', '10:00-11:00',
-                            '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00',
-                            '15:00-16:00', '16:00-17:00'
-                        ];
-                        
-                        // Merge existing and default time slots, sort by start time
-                        $allTimeSlots = array_merge($defaultTimeSlots, array_keys($existingTimeSlots));
-                        $allTimeSlots = array_unique($allTimeSlots);
-                        
-                        // Sort time slots by start time
-                        usort($allTimeSlots, function($a, $b) {
-                            $startA = explode('-', $a)[0];
-                            $startB = explode('-', $b)[0];
-                            return strcmp($startA, $startB);
-                        });
-                        
-                        $timeSlots = $allTimeSlots;
-                        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                        
-                        // Organize schedules by day and time
-                        $scheduleGrid = [];
-                        foreach ($schedules as $schedule) {
-                            $timeKey = date('H:i', strtotime($schedule['start_time'])) . '-' . date('H:i', strtotime($schedule['end_time']));
-                            $scheduleGrid[$schedule['day_of_week']][$timeKey] = $schedule;
-                        }
-                        ?>
-                        
-                <?php foreach ($timeSlots as $timeSlot): ?>
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h6 class="mb-0 fw-bold"><?= $timeSlot ?></h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <?php foreach ($days as $day): ?>
-                            <div class="col-md-2 mb-3">
-                                <h6 class="text-center mb-2"><?= $day ?></h6>
-                                <?php 
-                                $schedule = $scheduleGrid[$day][$timeSlot] ?? null;
-                                if ($schedule): 
-                                ?>
-                                    <div class="schedule-item p-2 bg-primary text-white rounded text-center">
-                                        <div class="fw-bold small"><?= esc($schedule['subject_name']) ?></div>
-                                        <small class="text-white"><?= esc($schedule['section_name']) ?></small>
-                                        <?php if ($schedule['room']): ?>
-                                            <div><small class="text-white"><i class="bi bi-geo-alt"></i> <?= esc($schedule['room']) ?></small></div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="text-center text-muted py-3 border rounded">
-                                        <small>Free Period</small>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-<?php else: ?>
-    <div class="card">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-calendar3 fs-1 text-muted mb-3"></i>
-            <h5 class="text-muted">No Schedule Available</h5>
-            <p class="text-muted mb-0">Your teaching schedule has not been set up yet. Please contact the administrator.</p>
-        </div>
+<?php if ($error = session('error')): ?>
+    <div class="alert alert-danger alert-dismissible fade show">
+        <?= esc($error) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
-<?= $this->endSection() ?> 
+<?php if ($success = session('success')): ?>
+    <div class="alert alert-success alert-dismissible fade show">
+        <?= esc($success) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Weekly Schedule</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="<?= base_url('teacher/schedule/save') ?>">
+            <?= csrf_field() ?>
+            
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 120px;">Time</th>
+                            <th>Monday</th>
+                            <th>Tuesday</th>
+                            <th>Wednesday</th>
+                            <th>Thursday</th>
+                            <th>Friday</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $timeSlots = [
+                            '07:00-08:00', '08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00',
+                            '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00'
+                        ];
+                        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+                        ?>
+                        
+                        <?php foreach ($timeSlots as $timeSlot): ?>
+                            <tr>
+                                <td class="fw-bold text-center align-middle"><?= $timeSlot ?></td>
+                                <?php foreach ($days as $day): ?>
+                                    <td style="padding: 8px;">
+                                        <?php 
+                                        $currentSchedule = $schedules[$day][$timeSlot] ?? null;
+                                        ?>
+                                        
+                                        <div class="mb-2">
+                                            <label class="form-label small">Subject</label>
+                                            <select name="schedule[<?= $day ?>][<?= $timeSlot ?>][subject_id]" class="form-select form-select-sm">
+                                                <option value="">Select Subject</option>
+                                                <?php foreach ($subjects as $subject): ?>
+                                                    <option value="<?= $subject['id'] ?>" 
+                                                            <?= ($currentSchedule && $currentSchedule['subject_id'] == $subject['id']) ? 'selected' : '' ?>>
+                                                        <?= esc($subject['subject_name']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-2">
+                                            <label class="form-label small">Section</label>
+                                            <select name="schedule[<?= $day ?>][<?= $timeSlot ?>][section_id]" class="form-select form-select-sm">
+                                                <option value="">Select Section</option>
+                                                <?php foreach ($sections as $section): ?>
+                                                    <option value="<?= $section['id'] ?>" 
+                                                            <?= ($currentSchedule && $currentSchedule['section_id'] == $section['id']) ? 'selected' : '' ?>>
+                                                        <?= esc($section['section_name']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="form-label small">Room</label>
+                                            <input type="text" name="schedule[<?= $day ?>][<?= $timeSlot ?>][room]" 
+                                                   class="form-control form-control-sm" 
+                                                   placeholder="Room"
+                                                   value="<?= $currentSchedule ? esc($currentSchedule['room']) : '' ?>">
+                                        </div>
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-2"></i>Save Schedule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<?= $this->endSection() ?>

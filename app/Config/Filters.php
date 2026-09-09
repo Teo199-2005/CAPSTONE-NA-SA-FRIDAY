@@ -1,5 +1,4 @@
 <?php
-
 namespace Config;
 
 use CodeIgniter\Config\Filters as BaseFilters;
@@ -39,6 +38,8 @@ class Filters extends BaseFilters
         'group'         => \App\Filters\AuthFilter::class,
         'permission'    => \App\Filters\AuthFilter::class,
         'studentaccess' => \App\Filters\StudentAccessFilter::class,
+        'teacheraccess' => \App\Filters\TeacherAccessFilter::class,
+        'adminaccess'   => \App\Filters\AdminAccessFilter::class,
     ];
 
     /**
@@ -55,13 +56,9 @@ class Filters extends BaseFilters
      * @var array{before: list<string>, after: list<string>}
      */
     public array $required = [
-        'before' => [
-            'pagecache',  // Web Page Caching
-        ],
+        'before' => [],
         'after' => [
-            'pagecache',   // Web Page Caching
             'performance', // Performance Metrics
-            'toolbar',     // Debug Toolbar
         ],
     ];
 
@@ -76,13 +73,12 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
-            // 'csrf',
-            // 'honeypot',
-            // 'invalidchars',
+            'csrf' => ['except' => ['sections/*', 'admin/childpro-gad/*', 'admin/dashboard/createAdmin', 'admin/dashboard/toggleEnrollment', 'admin/dashboard/toggleGrading']],
+            'invalidchars',
         ],
         'after' => [
             'secureheaders',
-            // 'honeypot',
+            'honeypot',
         ],
     ];
 
@@ -111,6 +107,8 @@ class Filters extends BaseFilters
      * @var array<string, array<string, list<string>>>
      */
     public array $filters = [
-        'studentaccess' => ['before' => ['student/*']]
+        'studentaccess' => ['before' => ['student/*']],
+        'teacheraccess' => ['before' => ['teacher/*']],
+        'adminaccess'   => ['before' => ['admin/*']],
     ];
 }

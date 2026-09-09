@@ -5,7 +5,7 @@
     <div class="col-md-6 col-lg-5">
       <div class="card border-0 shadow-sm">
         <div class="card-body p-4">
-          <h1 class="h4 mb-3">Login to LPHS SMS</h1>
+          <h1 class="h4 mb-3">Login to CSCS SMS</h1>
 
           <?php if ($error = session()->getFlashdata('error')): ?>
             <div class="alert alert-danger"><?= esc($error) ?></div>
@@ -56,6 +56,7 @@
   </div>
 </div>
 <?= $this->endSection() ?>
+
 
 
 

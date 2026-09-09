@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -13,7 +12,7 @@ class SampleTeachersSeeder extends Seeder
         // Clear existing teachers first
         $db->table('teachers')->truncate();
         
-        // LPHS Teachers with Subjects & Schedules
+        // CSCS Teachers with Subjects & Schedules
         $teachers = [
             [
                 'teacher_id' => '2025-0001',
@@ -277,3 +276,4 @@ class SampleTeachersSeeder extends Seeder
         }
     }
 }
+

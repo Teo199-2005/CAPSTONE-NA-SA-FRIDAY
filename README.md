@@ -1,6 +1,6 @@
-# LPHS Student Management System
+# CSCS School Management System
 
-A comprehensive Student Management System built with CodeIgniter 4 for Loboc Pilot High School (LPHS).
+A comprehensive School Management System built with CodeIgniter 4 for Loboc Pilot High School (LPHS).
 
 ## Features
 

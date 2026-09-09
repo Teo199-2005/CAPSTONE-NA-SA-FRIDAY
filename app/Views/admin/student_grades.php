@@ -7,7 +7,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="bi bi-person-badge text-primary"></i>
+                        <i class="bi bi-person-badge dash-icon-inline"></i>
                         <?= esc($student['first_name'] . ' ' . $student['last_name']) ?> - Academic Record
                     </h5>
                     <button onclick="window.close()" class="btn btn-outline-secondary btn-sm">
@@ -19,7 +19,7 @@
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <p><strong>LRN:</strong> <?= esc($student['lrn']) ?></p>
-                            <p><strong>Grade Level:</strong> <?= esc($student['grade_level']) ?></p>
+                            <p><strong>Grade Level:</strong> <?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>School Year:</strong> <?= esc($schoolYear) ?></p>
@@ -31,29 +31,29 @@
                         </div>
                     </div>
 
-                    <!-- Quarter Tabs -->
-                    <ul class="nav nav-tabs" id="quarterTabs" role="tablist">
-                        <?php for ($q = 1; $q <= 4; $q++): ?>
+                    <!-- Term Tabs -->
+                    <ul class="nav nav-tabs" id="termTabs" role="tablist">
+                        <?php for ($t = 1; $t <= 3; $t++): ?>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link <?= $q === 1 ? 'active' : '' ?>" 
-                                        id="quarter<?= $q ?>-tab" 
-                                        data-bs-toggle="tab" 
-                                        data-bs-target="#quarter<?= $q ?>" 
+                                <button class="nav-link <?= $t === 1 ? 'active' : '' ?>"
+                                        id="term<?= $t ?>-tab"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#term<?= $t ?>"
                                         type="button" role="tab">
-                                    Quarter <?= $q ?>
-                                    <?php if (isset($allQuarterGrades[$q]) && $allQuarterGrades[$q] !== null): ?>
-                                        <span class="badge bg-secondary ms-1"><?= number_format($allQuarterGrades[$q], 1) ?></span>
+                                    Term <?= $t ?>
+                                    <?php if (isset($allTermGrades[$t]) && $allTermGrades[$t] !== null): ?>
+                                        <span class="badge bg-secondary ms-1"><?= number_format($allTermGrades[$t], 1) ?></span>
                                     <?php endif; ?>
                                 </button>
                             </li>
                         <?php endfor; ?>
                     </ul>
 
-                    <!-- Quarter Content -->
-                    <div class="tab-content" id="quarterTabsContent">
-                        <?php for ($q = 1; $q <= 4; $q++): ?>
-                            <div class="tab-pane fade <?= $q === 1 ? 'show active' : '' ?>" 
-                                 id="quarter<?= $q ?>" role="tabpanel">
+                    <!-- Term Content -->
+                    <div class="tab-content" id="termTabsContent">
+                        <?php for ($t = 1; $t <= 3; $t++): ?>
+                            <div class="tab-pane fade <?= $t === 1 ? 'show active' : '' ?>"
+                                 id="term<?= $t ?>" role="tabpanel">
                                 <div class="table-responsive mt-3">
                                     <table class="table table-hover">
                                         <thead class="table-light">
@@ -65,8 +65,8 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php if (isset($grades[$q])): ?>
-                                                <?php foreach ($grades[$q] as $gradeData): ?>
+                                            <?php if (isset($grades[$t])): ?>
+                                                <?php foreach ($grades[$t] as $gradeData): ?>
                                                     <tr>
                                                         <td><?= esc($gradeData['subject']['subject_name']) ?></td>
                                                         <td><span class="badge bg-light text-dark"><?= esc($gradeData['subject']['subject_code']) ?></span></td>
@@ -92,20 +92,20 @@
                                         </tbody>
                                         <tfoot class="table-light">
                                             <tr>
-                                                <td colspan="2"><strong class="fs-5">Quarter Average:</strong></td>
+                                                <td colspan="2"><strong class="fs-5">Term Average:</strong></td>
                                                 <td>
-                                                    <?php if (isset($allQuarterGrades[$q]) && $allQuarterGrades[$q] !== null): ?>
-                                                        <span class="badge bg-<?= $allQuarterGrades[$q] >= 90 ? 'success' : ($allQuarterGrades[$q] >= 85 ? 'info' : ($allQuarterGrades[$q] >= 75 ? 'warning' : 'danger')) ?> text-white fs-5 px-3 py-2">
-                                                            <?= number_format($allQuarterGrades[$q], 2) ?>
+                                                    <?php if (isset($allTermGrades[$t]) && $allTermGrades[$t] !== null): ?>
+                                                        <span class="badge bg-<?= $allTermGrades[$t] >= 90 ? 'success' : ($allTermGrades[$t] >= 85 ? 'info' : ($allTermGrades[$t] >= 75 ? 'warning' : 'danger')) ?> text-white fs-5 px-3 py-2">
+                                                            <?= number_format($allTermGrades[$t], 2) ?>
                                                         </span>
                                                     <?php else: ?>
                                                         <span class="text-muted fs-5">N/A</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <?php if (isset($allQuarterGrades[$q]) && $allQuarterGrades[$q] !== null): ?>
-                                                        <span class="badge bg-<?= $allQuarterGrades[$q] >= 75 ? 'success' : 'danger' ?> text-white fs-5 px-3 py-2">
-                                                            <?= $allQuarterGrades[$q] >= 75 ? 'PASSED' : 'FAILED' ?>
+                                                    <?php if (isset($allTermGrades[$t]) && $allTermGrades[$t] !== null): ?>
+                                                        <span class="badge bg-<?= $allTermGrades[$t] >= 75 ? 'success' : 'danger' ?> text-white fs-5 px-3 py-2">
+                                                            <?= $allTermGrades[$t] >= 75 ? 'PASSED' : 'FAILED' ?>
                                                         </span>
                                                     <?php else: ?>
                                                         <span class="text-muted fs-5">--</span>

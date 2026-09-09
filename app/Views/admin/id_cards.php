@@ -27,9 +27,9 @@
         <label class="form-label">Grade Level</label>
         <select class="form-select" name="grade">
           <option value="">All Grades</option>
-          <?php for ($grade = 7; $grade <= 12; $grade++): ?>
-            <option value="<?= $grade ?>" <?= $gradeFilter == $grade ? 'selected' : '' ?>>Grade <?= $grade ?></option>
-          <?php endfor; ?>
+          <?php foreach (grade_level_options() as $grade): ?>
+            <option value="<?= $grade ?>" <?= $gradeFilter == $grade ? 'selected' : '' ?>><?= esc(grade_level_label((int) $grade)) ?></option>
+          <?php endforeach; ?>
         </select>
       </div>
       <div class="col-md-3">
@@ -38,7 +38,7 @@
           <option value="">All Sections</option>
           <?php foreach ($allSections as $section): ?>
             <option value="<?= $section['id'] ?>" <?= $sectionFilter == $section['id'] ? 'selected' : '' ?>>
-              Grade <?= $section['grade_level'] ?> - <?= esc($section['section_name']) ?>
+              <?= esc(grade_level_label((int) $section['grade_level'])) ?> - <?= esc($section['section_name']) ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -83,8 +83,8 @@
             <div class="card-body p-3">
               <div class="d-flex align-items-center mb-3">
                 <div class="me-3">
-                  <?php if (!empty($student['photo']) && file_exists(FCPATH . 'uploads/enrollment_documents/' . $student['photo'])): ?>
-                    <img src="<?= base_url('uploads/enrollment_documents/' . $student['photo']) ?>" alt="Photo" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
+                  <?php if (!empty($student['photo'])): ?>
+                    <img src="<?= base_url('files/' . $student['photo']) ?>" alt="Photo" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
                   <?php else: ?>
                     <div class="bg-secondary rounded d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
                       <i class="bi bi-person text-white"></i>
@@ -93,12 +93,12 @@
                 </div>
                 <div class="flex-grow-1">
                   <h6 class="mb-1"><?= esc($student['last_name'] . ', ' . $student['first_name']) ?></h6>
-                  <small class="text-muted">ID: <?= esc($student['student_id'] ?? 'Pending') ?></small>
+                  <small class="text-muted">LRN: <?= esc($student['lrn'] ?? 'Pending') ?></small>
                 </div>
               </div>
               
               <div class="mb-3">
-                <span class="badge bg-primary me-2">Grade <?= esc($student['grade_level']) ?></span>
+                <span class="badge bg-primary me-2"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></span>
                 <?php if ($student['section_name']): ?>
                   <span class="badge bg-secondary"><?= esc($student['section_name']) ?></span>
                 <?php endif; ?>
@@ -130,11 +130,25 @@
           </a>
         </li>
         
-        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+        <?php 
+        $startPage = max(1, $currentPage - 5);
+        $endPage = min($totalPages, $currentPage + 5);
+        
+        if ($startPage > 1): ?>
+          <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => 1])) ?>">1</a></li>
+          <?php if ($startPage > 2): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+        <?php endif; ?>
+        
+        <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
           <li class="page-item <?= $i == $currentPage ? 'active' : '' ?>">
             <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
           </li>
         <?php endfor; ?>
+        
+        <?php if ($endPage < $totalPages): ?>
+          <?php if ($endPage < $totalPages - 1): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+          <li class="page-item"><a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $totalPages])) ?>"><?= $totalPages ?></a></li>
+        <?php endif; ?>
         
         <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
           <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $currentPage + 1])) ?>">

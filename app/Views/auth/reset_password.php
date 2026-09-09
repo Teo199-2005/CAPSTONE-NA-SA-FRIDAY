@@ -10,7 +10,7 @@
   justify-content: center;
   padding: 4rem 1rem;
   position: relative;
-  margin: -2rem -15px -2rem -15px;
+  margin: -2rem -15px 0 -15px;
 }
 
 .reset-container::before {
@@ -104,6 +104,8 @@
   margin-bottom: 2rem;
   position: relative;
   overflow: hidden;
+  min-height: 52px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .reset-btn:hover {
@@ -170,6 +172,218 @@
   font-weight: 500;
   margin-bottom: 1.5rem;
   text-align: center;
+}
+
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+
+@media (max-width: 767.98px) {
+  .reset-container {
+    padding: 2rem 0.75rem;
+    margin: -2rem -15px 0 -15px;
+  }
+  
+  .reset-card {
+    max-width: 400px;
+    border-radius: 16px;
+  }
+  
+  .reset-header {
+    padding: 2rem 1.5rem 1.25rem;
+  }
+  
+  .reset-title {
+    font-size: 1.5rem;
+  }
+  
+  .reset-subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .reset-body {
+    padding: 1.5rem;
+  }
+  
+  .form-control {
+    padding: 0.875rem 1rem;
+    font-size: 16px;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+  }
+  
+  .reset-btn {
+    padding: 0.875rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+  }
+  
+  .back-section {
+    padding-top: 1.25rem;
+    margin: 0 -1.5rem -1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+  
+  .back-text {
+    font-size: 0.9rem;
+  }
+  
+  .alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
+  
+  .email-display {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .reset-container {
+    padding: 1.5rem 0.5rem;
+  }
+  
+  .reset-card {
+    border-radius: 14px;
+    max-width: 100%;
+  }
+  
+  .reset-header {
+    padding: 1.5rem 1rem 1rem;
+  }
+  
+  .reset-title {
+    font-size: 1.25rem;
+  }
+  
+  .reset-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .reset-body {
+    padding: 1.25rem;
+  }
+  
+  .form-control {
+    padding: 0.75rem 0.875rem;
+    font-size: 16px;
+    border-radius: 10px;
+  }
+  
+  .reset-btn {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+  }
+  
+  .back-section {
+    padding-top: 1rem;
+    margin: 0 -1.25rem -1.25rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+  
+  .back-text {
+    font-size: 0.85rem;
+  }
+  
+  .alert {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+  
+  .email-display {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .reset-header {
+    padding: 1rem 0.75rem 0.75rem;
+  }
+  
+  .reset-title {
+    font-size: 1.1rem;
+  }
+  
+  .reset-body {
+    padding: 1rem;
+  }
+  
+  .form-control {
+    padding: 0.625rem 0.75rem;
+    font-size: 16px;
+  }
+  
+  .reset-btn {
+    padding: 0.625rem;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  
+  .back-section {
+    margin: 0 -1rem -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .reset-container {
+    height: auto;
+    min-height: auto;
+    padding: 1rem 0.5rem;
+  }
+  
+  .reset-header {
+    padding: 1rem 1rem 0.75rem;
+  }
+  
+  .reset-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .reset-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .reset-body {
+    padding: 0.75rem 1rem;
+  }
+  
+  .form-control {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .reset-btn {
+    padding: 0.5rem;
+    min-height: 38px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .back-section {
+    padding-top: 0.75rem;
+    margin: 0 -1rem -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1rem;
+  }
 }
 </style>
 

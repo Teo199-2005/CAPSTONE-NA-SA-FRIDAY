@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -13,8 +12,8 @@ class SectionModel extends Model
     protected $useSoftDeletes = true;
     protected $protectFields = true;
     protected $allowedFields = [
-        'section_name', 'grade_level', 'school_year', 'adviser_id',
-        'max_capacity', 'current_enrollment', 'is_active'
+        'section_name', 'grade_level', 'school_year', 'grading_type',
+        'adviser_id', 'max_capacity', 'current_enrollment', 'is_active'
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -35,8 +34,9 @@ class SectionModel extends Model
     // Validation
     protected $validationRules = [
         'section_name' => 'required|max_length[100]',
-        'grade_level' => 'required|integer|greater_than[6]|less_than[11]',
+        'grade_level' => 'required|integer|in_list[0,1,2,3,4,5,6,7,99]',
         'school_year' => 'required|max_length[9]',
+        'grading_type' => 'permit_empty|in_list[numerical,non_numerical,custom]',
         'max_capacity' => 'integer|greater_than[0]',
         'current_enrollment' => 'integer|greater_than_equal_to[0]'
     ];
@@ -164,11 +164,20 @@ class SectionModel extends Model
     /**
      * Get sections with adviser information and student count
      */
-    public function getSectionsWithAdviser(string $schoolYear): array
+    public function getSectionsWithAdviser(?string $schoolYear = null): array
     {
         $db = \Config\Database::connect();
-        return $db->query("
-            SELECT s.*, 
+        $where = "s.deleted_at IS NULL AND s.is_active = 1";
+        $params = [];
+        
+        if ($schoolYear !== null) {
+            $where .= " AND s.school_year = ?";
+            $params[] = $schoolYear;
+        }
+        
+        return $db->query(
+            "
+            SELECT s.*,
                    COUNT(st.id) as current_enrollment,
                    t.first_name as adviser_first_name,
                    t.last_name as adviser_last_name,
@@ -177,9 +186,74 @@ class SectionModel extends Model
             FROM sections s
             LEFT JOIN students st ON st.section_id = s.id AND st.enrollment_status = 'enrolled'
             LEFT JOIN teachers t ON t.id = s.adviser_id AND t.deleted_at IS NULL
-            WHERE s.school_year = ? AND s.deleted_at IS NULL
+            WHERE {$where}
             GROUP BY s.id
             ORDER BY s.grade_level ASC, s.section_name ASC
-        ", [$schoolYear])->getResultArray();
+            ",
+            $params
+        )->getResultArray();
+    }
+
+    /**
+     * Check if section uses non-numerical (symbol-based) grading
+     */
+    public function isNonNumerical($sectionId): bool
+    {
+        $section = $this->find($sectionId);
+        return $section && ($section['grading_type'] ?? 'numerical') === 'non_numerical';
+    }
+
+    /**
+     * Get subjects for a section
+     */
+    public function getSectionSubjects($sectionId)
+    {
+        $db = \Config\Database::connect();
+        return $db->table('subjects s')
+            ->select('s.*')
+            ->join('section_subjects ss', 'ss.subject_id = s.id')
+            ->where('ss.section_id', $sectionId)
+            ->where('s.deleted_at IS NULL')
+            ->orderBy('s.subject_name', 'ASC')
+            ->get()->getResultArray();
+    }
+
+    /**
+     * Add subject to section
+     */
+    public function addSubjectToSection($sectionId, $subjectId)
+    {
+        $db = \Config\Database::connect();
+        return $db->table('section_subjects')->insert([
+            'section_id' => $sectionId,
+            'subject_id' => $subjectId
+        ]);
+    }
+
+    /**
+     * Remove subject from section
+     */
+    public function removeSubjectFromSection($sectionId, $subjectId)
+    {
+        $db = \Config\Database::connect();
+        return $db->table('section_subjects')
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->delete();
+    }
+
+    /**
+     * Get section with subjects count
+     */
+    public function getSectionWithSubjectsCount($sectionId)
+    {
+        $db = \Config\Database::connect();
+        return $db->query("
+            SELECT s.*, COUNT(ss.id) as subjects_count
+            FROM sections s
+            LEFT JOIN section_subjects ss ON ss.section_id = s.id
+            WHERE s.id = ? AND s.deleted_at IS NULL
+            GROUP BY s.id
+        ", [$sectionId])->getRowArray();
     }
 }

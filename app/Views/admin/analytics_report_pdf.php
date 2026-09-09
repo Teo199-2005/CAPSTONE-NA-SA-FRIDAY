@@ -5,7 +5,7 @@
     <title>LPHS Teacher Analytics Report</title>
     <style>
         body {
-            font-family: 'Times New Roman', serif;
+            font-family: Arial, Helvetica, sans-serif;
             margin: 0;
             padding: 20px;
             color: #000;
@@ -129,17 +129,15 @@
     <div class="header">
         <div class="logo">
             <?php
-            $logoPath = FCPATH . 'LPHS2.png';
-            if (file_exists($logoPath) && function_exists('imagecreatefrompng')) {
-                $imageData = file_get_contents($logoPath);
-                $base64 = base64_encode($imageData);
-                echo '<img src="data:image/png;base64,' . $base64 . '" alt="LPHS Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">';
+            $logoB64 = school_logo_base64();
+            if ($logoB64 !== '') {
+                echo '<img src="data:image/png;base64,' . esc($logoB64, 'attr') . '" alt="School Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">';
             } else {
-                echo '<div style="width: 80px; height: 80px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #f0f0f0;"><strong style="font-size: 18px;">LPHS</strong></div>';
+                echo '<div style="width: 80px; height: 80px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #f0f0f0;"><strong style="font-size: 18px;">CSCS</strong></div>';
             }
             ?>
         </div>
-        <div class="school-name">Lourdes Provincial High School</div>
+        <div class="school-name">Cauayan South Central School</div>
         <div class="report-title">Teacher Class Analytics Report</div>
         <div class="report-info">Report Generated: <?= $reportDate ?></div>
     </div>
@@ -149,7 +147,7 @@
     </div>
     
     <div class="footer">
-        <p>Lourdes Provincial High School - Teacher Analytics Report | Generated on <?= date('F j, Y \a\t g:i A') ?></p>
+        <p>Cauayan South Central School - Teacher Analytics Report | Generated on <?= date('F j, Y \a\t g:i A') ?></p>
         <p>This report contains confidential information. Distribution is restricted to authorized personnel only.</p>
     </div>
 </body>

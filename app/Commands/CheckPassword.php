@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Commands;
 
 use CodeIgniter\CLI\BaseCommand;

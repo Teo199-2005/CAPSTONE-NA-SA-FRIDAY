@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 use App\Models\AnnouncementModel;
@@ -57,7 +56,7 @@ class Announcements extends BaseController
     public function storeAjax()
     {
         // Check if user is admin
-        if (!auth()->user() || !auth()->user()->inGroup('admin')) {
+        if (!auth()->user() || ! is_any_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
@@ -104,7 +103,7 @@ class Announcements extends BaseController
     public function listAjax()
     {
         // Check if user is admin
-        if (!auth()->user() || !auth()->user()->inGroup('admin')) {
+        if (!auth()->user() || ! is_any_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
@@ -123,7 +122,7 @@ class Announcements extends BaseController
     public function getAjax($id)
     {
         // Check if user is admin
-        if (!auth()->user() || !auth()->user()->inGroup('admin')) {
+        if (!auth()->user() || ! is_any_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
@@ -149,7 +148,7 @@ class Announcements extends BaseController
     public function updateAjax($id)
     {
         // Check if user is admin
-        if (!auth()->user() || !auth()->user()->inGroup('admin')) {
+        if (!auth()->user() || ! is_any_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
@@ -205,7 +204,7 @@ class Announcements extends BaseController
     public function deleteAjax($id)
     {
         // Check if user is admin
-        if (!auth()->user() || !auth()->user()->inGroup('admin')) {
+        if (!auth()->user() || ! is_any_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 

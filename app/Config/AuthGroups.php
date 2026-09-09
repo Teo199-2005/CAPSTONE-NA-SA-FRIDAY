@@ -42,8 +42,12 @@ class AuthGroups extends ShieldAuthGroups
      */
     public array $groups = [
         'admin' => [
-            'title'       => 'Admin',
-            'description' => 'School administrators with full access.',
+            'title'       => 'Master admin',
+            'description' => 'School administrators with full access to all admin areas.',
+        ],
+        'admin_staff' => [
+            'title'       => 'Admin staff',
+            'description' => 'Administrative staff with access limited to pages assigned by a master admin.',
         ],
         'teacher' => [
             'title'       => 'Teacher',
@@ -91,6 +95,9 @@ class AuthGroups extends ShieldAuthGroups
             'users.create',
             'users.edit',
             'users.delete',
+        ],
+        'admin_staff' => [
+            'admin.access',
         ],
         'teacher' => [
             'admin.access',

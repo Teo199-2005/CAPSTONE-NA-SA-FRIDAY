@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <style>
@@ -78,10 +78,35 @@
                   <option value="">Select Target Audience</option>
                   <option value="all" <?= old('target_roles') === 'all' ? 'selected' : '' ?>>All Users</option>
                   <option value="admin" <?= old('target_roles') === 'admin' ? 'selected' : '' ?>>Administrators</option>
-                  <option value="teacher" <?= old('target_roles') === 'teacher' ? 'selected' : '' ?>>Teachers</option>
-                  <option value="student" <?= old('target_roles') === 'student' ? 'selected' : '' ?>>Students</option>
+                  <option value="teacher" <?= old('target_roles') === 'teacher' ? 'selected' : '' ?>>All Teachers</option>
+                  <option value="student" <?= old('target_roles') === 'student' ? 'selected' : '' ?>>All Students</option>
+                  <option value="specific_grade" <?= old('target_roles') === 'specific_grade' ? 'selected' : '' ?>>Grade Level</option>
+                  <option value="specific_section" <?= old('target_roles') === 'specific_section' ? 'selected' : '' ?>>Section</option>
                 </select>
                 <label for="target_roles">Target Audience *</label>
+              </div>
+            </div>
+            
+            <!-- Grade Level Selection (shown when specific_grade or specific_section is selected) -->
+            <div class="col-md-6" id="gradeLevelContainer" style="display: none;">
+              <div class="form-floating">
+                <select class="form-select" id="grade_level" name="grade_level">
+                  <option value="">Select Grade Level</option>
+                  <?php foreach (grade_level_options() as $g): ?>
+                    <option value="<?= $g ?>"><?= esc(grade_level_label($g)) ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <label for="grade_level">Grade Level</label>
+              </div>
+            </div>
+            
+            <!-- Section Selection (shown when specific_section is selected) -->
+            <div class="col-md-6" id="sectionContainer" style="display: none;">
+              <div class="form-floating">
+                <select class="form-select" id="section_id" name="section_id">
+                  <option value="">Select Section</option>
+                </select>
+                <label for="section_id">Section</label>
               </div>
             </div>
             
@@ -169,12 +194,88 @@ document.getElementById('title').addEventListener('input', function() {
 
 // Update preview on content change
 document.getElementById('body').addEventListener('input', updatePreview);
-document.getElementById('target_roles').addEventListener('change', updatePreview);
+document.getElementById('target_roles').addEventListener('change', function() {
+  updatePreview();
+  handleTargetRoleChange();
+});
+document.getElementById('grade_level').addEventListener('change', function() {
+  loadSections();
+  updatePreview();
+});
+document.getElementById('section_id').addEventListener('change', updatePreview);
+
+// Handle target role change to show/hide grade and section dropdowns
+function handleTargetRoleChange() {
+  const targetRole = document.getElementById('target_roles').value;
+  const gradeLevelContainer = document.getElementById('gradeLevelContainer');
+  const sectionContainer = document.getElementById('sectionContainer');
+  const gradeLevel = document.getElementById('grade_level');
+  const sectionId = document.getElementById('section_id');
+  
+  // Reset selections
+  gradeLevel.value = '';
+  sectionId.value = '';
+  sectionId.innerHTML = '<option value="">Select Section</option>';
+  
+  // Show/hide containers based on selection
+  if (targetRole === 'specific_grade') {
+    gradeLevelContainer.style.display = 'block';
+    sectionContainer.style.display = 'none';
+    gradeLevel.required = true;
+    sectionId.required = false;
+  } else if (targetRole === 'specific_section') {
+    gradeLevelContainer.style.display = 'block';
+    sectionContainer.style.display = 'block';
+    gradeLevel.required = true;
+    sectionId.required = true;
+  } else {
+    gradeLevelContainer.style.display = 'none';
+    sectionContainer.style.display = 'none';
+    gradeLevel.required = false;
+    sectionId.required = false;
+  }
+}
+
+// Load sections based on selected grade level
+function loadSections() {
+  const gradeLevel = document.getElementById('grade_level').value;
+  const sectionSelect = document.getElementById('section_id');
+  
+  if (!gradeLevel) {
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    return;
+  }
+  
+  // Show loading state
+  sectionSelect.innerHTML = '<option value="">Loading sections...</option>';
+  
+  // Fetch sections for the selected grade level
+  fetch(`<?= base_url('admin/announcements/get-sections') ?>?grade_level=${gradeLevel}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success && data.sections) {
+        let options = '<option value="">Select Section</option>';
+        data.sections.forEach(section => {
+          options += `<option value="${section.id}">${section.section_name} (${formatGradeLevel(section.grade_level)})</option>`;
+        });
+        sectionSelect.innerHTML = options;
+      } else {
+        sectionSelect.innerHTML = '<option value="">No sections available</option>';
+      }
+    })
+    .catch(error => {
+      console.error('Error loading sections:', error);
+      sectionSelect.innerHTML = '<option value="">Error loading sections</option>';
+    });
+}
 
 function updatePreview() {
   const title = document.getElementById('title').value;
   const body = document.getElementById('body').value;
   const target = document.getElementById('target_roles').value;
+  const gradeLevel = document.getElementById('grade_level').value;
+  const sectionId = document.getElementById('section_id').value;
+  const sectionText = sectionId ? document.getElementById('section_id').options[document.getElementById('section_id').selectedIndex].text : '';
   const previewContent = document.getElementById('previewContent');
   
   if (!title && !body) {
@@ -187,7 +288,15 @@ function updatePreview() {
     return;
   }
   
-  const targetBadge = target ? `<span class="badge bg-secondary mb-2">${target}</span>` : '';
+  // Build target badge text
+  let targetText = target;
+  if (target === 'specific_grade' && gradeLevel) {
+    targetText = `${formatGradeLevel(gradeLevel)}`;
+  } else if (target === 'specific_section' && sectionText) {
+    targetText = sectionText;
+  }
+  
+  const targetBadge = targetText ? `<span class="badge bg-secondary mb-2">${targetText}</span>` : '';
   const titleHtml = title ? `<h5 class="fw-bold text-primary">${escapeHtml(title)}</h5>` : '';
   const bodyHtml = body ? `<p class="mb-0">${escapeHtml(body).replace(/\n/g, '<br>')}</p>` : '';
   
@@ -214,29 +323,53 @@ function escapeHtml(text) {
 }
 
 // Form validation
-document.getElementById('announcementForm').addEventListener('submit', function(e) {
+document.getElementById('announcementForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
   const title = document.getElementById('title').value.trim();
   const body = document.getElementById('body').value.trim();
   const target = document.getElementById('target_roles').value;
+  const gradeLevel = document.getElementById('grade_level').value;
+  const sectionId = document.getElementById('section_id').value;
   
   if (!title || !body || !target) {
-    e.preventDefault();
-    alert('Please fill in all required fields.');
+    await customAlert('Please fill in all required fields.', 'Validation Error');
+    return false;
+  }
+  
+  if (target === 'specific_grade' && !gradeLevel) {
+    await customAlert('Please select a grade level.', 'Validation Error');
+    return false;
+  }
+  
+  if (target === 'specific_section' && (!gradeLevel || !sectionId)) {
+    await customAlert('Please select both grade level and section.', 'Validation Error');
     return false;
   }
   
   if (title.length > 255) {
-    e.preventDefault();
-    alert('Title must be 255 characters or less.');
+    await customAlert('Title must be 255 characters or less.', 'Validation Error');
     return false;
   }
   
+  // Build confirmation message
+  let targetText = target;
+  if (target === 'specific_grade' && gradeLevel) {
+    targetText = `${formatGradeLevel(gradeLevel)} students`;
+  } else if (target === 'specific_section' && sectionId) {
+    const sectionText = document.getElementById('section_id').options[document.getElementById('section_id').selectedIndex].text;
+    targetText = sectionText;
+  }
+  
   // Confirm before publishing
-  if (!confirm(`Are you sure you want to publish this announcement to ${target}?`)) {
-    e.preventDefault();
-    return false;
+  const confirmed = await customConfirm(`Are you sure you want to publish this announcement to ${targetText}?`, 'Confirm Publication');
+  if (confirmed) {
+    this.submit();
   }
 });
+
+// Initialize on page load
+handleTargetRoleChange();
 
 // Initialize preview
 updatePreview();

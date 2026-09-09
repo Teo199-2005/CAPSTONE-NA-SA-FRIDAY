@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -14,7 +13,7 @@ class UpdateStudentEmailSeeder extends Seeder
         $updated = $db->table('students')
             ->where('first_name', 'Maria')
             ->where('last_name', 'Santos')
-            ->where('grade_level', 10)
+            ->where('grade_level', 6)
             ->update([
                 'email' => 'mariasantos67@hotmail.com',
                 'updated_at' => date('Y-m-d H:i:s')

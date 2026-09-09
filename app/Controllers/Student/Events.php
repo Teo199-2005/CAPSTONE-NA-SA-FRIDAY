@@ -19,10 +19,11 @@ class Events extends BaseController
             return redirect()->to(base_url('/'));
         }
         return view('student/events', [
-            'title' => 'Events & Activities - LPHS SMS',
+            'title' => 'Events & Activities - CSCS SMS',
         ]);
     }
 }
+
 
 
 

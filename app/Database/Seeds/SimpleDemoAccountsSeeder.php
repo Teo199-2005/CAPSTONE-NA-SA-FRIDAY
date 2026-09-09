@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -89,7 +88,7 @@ class SimpleDemoAccountsSeeder extends Seeder
                 'date_of_birth' => '2008-01-01',
                 'email' => $studentEmail,
                 'enrollment_status' => 'enrolled',
-                'grade_level' => 10,
+                'grade_level' => 6,
                 'school_year' => '2024-2025',
                 'address' => 'Demo Address',
                 'contact_number' => '09123456789',

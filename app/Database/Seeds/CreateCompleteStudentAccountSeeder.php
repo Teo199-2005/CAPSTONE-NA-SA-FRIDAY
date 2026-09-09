@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -35,34 +34,31 @@ class CreateCompleteStudentAccountSeeder extends Seeder
             echo "Created new user with ID: $userId\n";
         }
         
-        // Check if student record exists
         $existingStudent = $db->table('students')
             ->where('first_name', 'Maria')
             ->where('last_name', 'Santos')
-            ->where('grade_level', 10)
+            ->where('grade_level', 6)
             ->get()
             ->getRowArray();
-        
+
         if ($existingStudent) {
-            // Update existing student record
             $db->table('students')
                 ->where('id', $existingStudent['id'])
                 ->update([
-                    'user_id' => $userId,
+                    'user_id'           => $userId,
                     'enrollment_status' => 'enrolled',
-                    'updated_at' => date('Y-m-d H:i:s')
+                    'updated_at'        => date('Y-m-d H:i:s'),
                 ]);
             echo "Updated existing student record ID: {$existingStudent['id']}\n";
         } else {
-            // Get a Grade 10 section
-            $grade10Section = $db->table('sections')
-                ->where('grade_level', 10)
+            $section = $db->table('sections')
+                ->where('grade_level', 6)
                 ->where('is_active', true)
                 ->get()
                 ->getRowArray();
-            
-            if (!$grade10Section) {
-                echo "No Grade 10 section found!\n";
+
+            if (! $section) {
+                echo "No Grade 6 section found!\n";
                 return;
             }
             
@@ -86,8 +82,8 @@ class CreateCompleteStudentAccountSeeder extends Seeder
                 'emergency_contact_name' => 'Rosa Santos',
                 'emergency_contact_number' => '09987654321',
                 'emergency_contact_relationship' => 'Mother',
-                'grade_level' => 10,
-                'section_id' => $grade10Section['id'],
+                'grade_level' => 6,
+                'section_id' => $section['id'],
                 'enrollment_status' => 'enrolled',
                 'school_year' => '2025-2026',
                 'created_at' => date('Y-m-d H:i:s'),

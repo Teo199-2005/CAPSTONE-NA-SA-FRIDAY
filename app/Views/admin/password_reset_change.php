@@ -5,7 +5,7 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h1 class="h3 fw-bold text-primary mb-1">Change Password</h1>
-      <p class="text-muted mb-0 small">Set new password for user: <?= esc($reset['email']) ?></p>
+      <p class="text-muted mb-0 small">Set new password for user: <?= esc(str_replace('mailto:', '', $reset['email'])) ?></p>
     </div>
     <a href="<?= base_url('admin/password-resets') ?>" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Back to Requests
@@ -33,12 +33,13 @@
     <div class="card bg-white border-0 shadow-sm rounded-3">
       <div class="card-body p-4">
         <div class="text-center mb-4">
-          <i class="bi bi-key-fill text-primary fs-1 mb-3"></i>
+          <i class="bi bi-key-fill dash-icon-inline fs-1 mb-3"></i>
           <h5 class="fw-bold">Set New Password</h5>
           <p class="text-muted small">Enter a new password for this user</p>
         </div>
 
         <form id="changePasswordForm" method="post" action="<?= base_url('admin/password-resets/change-password') ?>">
+          <?= csrf_field() ?>
           <input type="hidden" name="reset_id" value="<?= $reset['id'] ?>">
           
           <div class="mb-3">

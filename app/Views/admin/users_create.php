@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -71,10 +71,9 @@
             <label for="grade_level" class="form-label">Grade Level *</label>
             <select class="form-select" name="grade_level">
               <option value="">Select</option>
-              <option value="7" <?= old('grade_level') === '7' ? 'selected' : '' ?>>Grade 7</option>
-              <option value="8" <?= old('grade_level') === '8' ? 'selected' : '' ?>>Grade 8</option>
-              <option value="9" <?= old('grade_level') === '9' ? 'selected' : '' ?>>Grade 9</option>
-              <option value="10" <?= old('grade_level') === '10' ? 'selected' : '' ?>>Grade 10</option>
+              <?php foreach (grade_level_options() as $g): ?>
+                <option value="<?= $g ?>" <?= old('grade_level') === (string) $g ? 'selected' : '' ?>><?= esc(grade_level_label($g)) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
           <div class="col-md-6 mb-3">

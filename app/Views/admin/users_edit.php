@@ -8,6 +8,9 @@
 
 <div class="card border-0 shadow-sm">
   <div class="card-body">
+    <?php if (! empty($error)): ?>
+      <div class="alert alert-danger"><?= esc($error) ?></div>
+    <?php endif; ?>
     <?= form_open('admin/users/edit/' . $user->id) ?>
       <?= csrf_field() ?>
       <div class="mb-3">
@@ -29,18 +32,26 @@
       </div>
 
       <div class="mb-3">
-        <label for="role" class="form-label">Role</label>
-        <?php $userGroups = $user->getGroups(); $currentRole = !empty($userGroups) ? $userGroups[0] : ''; ?>
-        <select class="form-select <?= isset($validation) && $validation->hasError('role') ? 'is-invalid' : '' ?>" 
-                id="role" name="role" required>
-          <option value="">Select Role</option>
-          <option value="admin" <?= old('role', $currentRole) === 'admin' ? 'selected' : '' ?>>Admin</option>
-          <option value="teacher" <?= old('role', $currentRole) === 'teacher' ? 'selected' : '' ?>>Teacher</option>
-          <option value="student" <?= old('role', $currentRole) === 'student' ? 'selected' : '' ?>>Student</option>
-          <option value="parent" <?= old('role', $currentRole) === 'parent' ? 'selected' : '' ?>>Parent</option>
-        </select>
-        <?php if (isset($validation) && $validation->hasError('role')): ?>
-          <div class="invalid-feedback"><?= $validation->getError('role') ?></div>
+        <label class="form-label">Role</label>
+        <?php if (! empty($privilegedAccount)): ?>
+          <?php $roleLabel = $user->inGroup('admin') ? 'Master admin' : 'Admin staff'; ?>
+          <div class="form-control-plaintext fw-semibold"><?= esc($roleLabel) ?></div>
+          <?php if ($user->inGroup('admin_staff') && function_exists('is_master_admin') && is_master_admin()): ?>
+            <a href="<?= base_url('admin/dashboard/staff-permissions/' . (int) $user->id) ?>" class="small">Edit page access</a>
+          <?php endif; ?>
+        <?php else: ?>
+          <?php $userGroups = $user->getGroups(); $currentRole = !empty($userGroups) ? $userGroups[0] : ''; ?>
+          <select class="form-select <?= isset($validation) && $validation->hasError('role') ? 'is-invalid' : '' ?>"
+                  id="role" name="role" required>
+            <option value="">Select Role</option>
+            <option value="admin" <?= old('role', $currentRole) === 'admin' ? 'selected' : '' ?>>Master admin</option>
+            <option value="teacher" <?= old('role', $currentRole) === 'teacher' ? 'selected' : '' ?>>Teacher</option>
+            <option value="student" <?= old('role', $currentRole) === 'student' ? 'selected' : '' ?>>Student</option>
+            <option value="parent" <?= old('role', $currentRole) === 'parent' ? 'selected' : '' ?>>Parent</option>
+          </select>
+          <?php if (isset($validation) && $validation->hasError('role')): ?>
+            <div class="invalid-feedback"><?= $validation->getError('role') ?></div>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
 

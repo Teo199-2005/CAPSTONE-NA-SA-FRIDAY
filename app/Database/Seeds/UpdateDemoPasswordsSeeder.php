@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -55,7 +54,7 @@ class UpdateDemoPasswordsSeeder extends Seeder
                 'lrn' => 'DEMO-STUDENT-001',
                 'first_name' => 'Demo',
                 'last_name' => 'Student',
-                'grade_level' => 10,
+                'grade_level' => 6,
                 'section_id' => 1,
                 'enrollment_status' => 'enrolled',
                 'created_at' => date('Y-m-d H:i:s'),

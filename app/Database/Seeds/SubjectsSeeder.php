@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -8,42 +7,49 @@ class SubjectsSeeder extends Seeder
 {
     public function run()
     {
-        $subjects = [
-            // Grade 7
-            ['subject_code' => 'ENG7', 'subject_name' => 'English 7', 'grade_level' => 7, 'units' => 3.0],
-            ['subject_code' => 'MATH7', 'subject_name' => 'Mathematics 7', 'grade_level' => 7, 'units' => 3.0],
-            ['subject_code' => 'SCI7', 'subject_name' => 'Science 7', 'grade_level' => 7, 'units' => 3.0],
-            ['subject_code' => 'FIL7', 'subject_name' => 'Filipino 7', 'grade_level' => 7, 'units' => 3.0],
-            ['subject_code' => 'AP7', 'subject_name' => 'Araling Panlipunan 7', 'grade_level' => 7, 'units' => 3.0],
-            ['subject_code' => 'PE7', 'subject_name' => 'Physical Education 7', 'grade_level' => 7, 'units' => 2.0],
-            
-            // Grade 8
-            ['subject_code' => 'ENG8', 'subject_name' => 'English 8', 'grade_level' => 8, 'units' => 3.0],
-            ['subject_code' => 'MATH8', 'subject_name' => 'Mathematics 8', 'grade_level' => 8, 'units' => 3.0],
-            ['subject_code' => 'SCI8', 'subject_name' => 'Science 8', 'grade_level' => 8, 'units' => 3.0],
-            ['subject_code' => 'FIL8', 'subject_name' => 'Filipino 8', 'grade_level' => 8, 'units' => 3.0],
-            ['subject_code' => 'AP8', 'subject_name' => 'Araling Panlipunan 8', 'grade_level' => 8, 'units' => 3.0],
-            ['subject_code' => 'PE8', 'subject_name' => 'Physical Education 8', 'grade_level' => 8, 'units' => 2.0],
-            
-            // Grade 9
-            ['subject_code' => 'ENG9', 'subject_name' => 'English 9', 'grade_level' => 9, 'units' => 3.0],
-            ['subject_code' => 'MATH9', 'subject_name' => 'Mathematics 9', 'grade_level' => 9, 'units' => 3.0],
-            ['subject_code' => 'SCI9', 'subject_name' => 'Science 9', 'grade_level' => 9, 'units' => 3.0],
-            ['subject_code' => 'FIL9', 'subject_name' => 'Filipino 9', 'grade_level' => 9, 'units' => 3.0],
-            ['subject_code' => 'AP9', 'subject_name' => 'Araling Panlipunan 9', 'grade_level' => 9, 'units' => 3.0],
-            ['subject_code' => 'PE9', 'subject_name' => 'Physical Education 9', 'grade_level' => 9, 'units' => 2.0],
-            
-            // Grade 10
-            ['subject_code' => 'ENG10', 'subject_name' => 'English 10', 'grade_level' => 10, 'units' => 3.0],
-            ['subject_code' => 'MATH10', 'subject_name' => 'Mathematics 10', 'grade_level' => 10, 'units' => 3.0],
-            ['subject_code' => 'SCI10', 'subject_name' => 'Science 10', 'grade_level' => 10, 'units' => 3.0],
-            ['subject_code' => 'FIL10', 'subject_name' => 'Filipino 10', 'grade_level' => 10, 'units' => 3.0],
-            ['subject_code' => 'AP10', 'subject_name' => 'Araling Panlipunan 10', 'grade_level' => 10, 'units' => 3.0],
-            ['subject_code' => 'PE10', 'subject_name' => 'Physical Education 10', 'grade_level' => 10, 'units' => 2.0],
-        ];
+        $subjects = [];
+
+        $subjects[] = ['subject_code' => 'LANGK', 'subject_name' => 'Language (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+        $subjects[] = ['subject_code' => 'MATHK', 'subject_name' => 'Mathematics (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+        $subjects[] = ['subject_code' => 'SCIK', 'subject_name' => 'Science (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+        $subjects[] = ['subject_code' => 'APK', 'subject_name' => 'Araling Panlipunan (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+        $subjects[] = ['subject_code' => 'MAPEHK', 'subject_name' => 'MAPEH (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+        $subjects[] = ['subject_code' => 'ESPK', 'subject_name' => 'Edukasyon sa Pagpapakatao (Kindergarten)', 'grade_level' => 0, 'units' => 1.0];
+
+        // Grades 1-3 core (DepEd MELC): Mother Tongue + Filipino + English + Math + AP + MAPEH + ESP.
+        // Science is added from Grade 3 onward.
+        foreach ([1, 2, 3] as $grade) {
+            $subjects[] = ['subject_code' => "MTB{$grade}", 'subject_name' => "Mother Tongue {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "FIL{$grade}", 'subject_name' => "Filipino {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "ENG{$grade}", 'subject_name' => "English {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "MATH{$grade}", 'subject_name' => "Mathematics {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "AP{$grade}", 'subject_name' => "Araling Panlipunan {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "MAPEH{$grade}", 'subject_name' => "MAPEH {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "ESP{$grade}", 'subject_name' => "Edukasyon sa Pagpapakatao {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            if ($grade === 3) {
+                $subjects[] = ['subject_code' => "SCI{$grade}", 'subject_name' => "Science {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            }
+        }
+
+        // Grade 4-6 core: Filipino, English, Math, Science, AP, MAPEH, ESP, EPP (TLE).
+        foreach ([4, 5, 6] as $grade) {
+            $subjects[] = ['subject_code' => "FIL{$grade}", 'subject_name' => "Filipino {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "ENG{$grade}", 'subject_name' => "English {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "MATH{$grade}", 'subject_name' => "Mathematics {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "SCI{$grade}", 'subject_name' => "Science {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "AP{$grade}", 'subject_name' => "Araling Panlipunan {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "MAPEH{$grade}", 'subject_name' => "MAPEH {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "ESP{$grade}", 'subject_name' => "Edukasyon sa Pagpapakatao {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+            $subjects[] = ['subject_code' => "EPP{$grade}", 'subject_name' => "Edukasyong Pantahanan at Pangkabuhayan {$grade}", 'grade_level' => $grade, 'units' => 1.0];
+        }
 
         foreach ($subjects as $subject) {
+            $subject['is_active']  = 1;
+            $subject['created_at'] = date('Y-m-d H:i:s');
+            $subject['updated_at'] = date('Y-m-d H:i:s');
             $this->db->table('subjects')->insert($subject);
         }
+
+        echo 'Inserted ' . count($subjects) . " elementary subjects (Kindergarten and Grades 1-6).\n";
     }
 }

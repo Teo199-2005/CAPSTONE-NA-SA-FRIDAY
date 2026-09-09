@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -43,7 +42,7 @@ class FixStudentRecordSeeder extends Seeder
                 'first_name' => 'Demo',
                 'last_name' => 'Student',
                 'email' => 'student@lphs.edu',
-                'grade_level' => 10,
+                'grade_level' => 6,
                 'section_id' => 1,
                 'enrollment_status' => 'enrolled',
                 'school_year' => '2024-2025',

@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>LPHS Student Report Card</title>
+    <title>Cauayan South Central School - Student Report Card</title>
     <style>
         body {
-            font-family: 'Times New Roman', serif;
+            font-family: Arial, Helvetica, sans-serif;
             margin: 0;
             padding: 10px 30px;
             color: #000;
@@ -131,18 +131,17 @@
 <body>
     <div class="header">
         <div class="logo">
-            <?php
-            $logoPath = FCPATH . 'LPHS2.png';
-            if (file_exists($logoPath) && function_exists('imagecreatefrompng')) {
-                $imageData = file_get_contents($logoPath);
-                $base64 = base64_encode($imageData);
-                echo '<img src="data:image/png;base64,' . $base64 . '" alt="LPHS Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">';
-            } else {
-                echo '<div style="width: 80px; height: 80px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #f0f0f0;"><strong style="font-size: 18px;">LPHS</strong></div>';
-            }
-            ?>
+            <?php $logoB64 = (($logoBase64 ?? '') !== '') ? $logoBase64 : school_logo_base64(); ?>
+            <?php if ($logoB64 !== ''): ?>
+                <img src="data:image/png;base64,<?= esc($logoB64, 'attr') ?>" alt="CSCS Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">
+            <?php else: ?>
+                <svg width="80" height="80" viewBox="0 0 80 80" style="margin: 0 auto; display: block;">
+                    <circle cx="40" cy="40" r="38" fill="#f0f0f0" stroke="#000" stroke-width="2"/>
+                    <text x="40" y="45" font-size="18" font-weight="bold" text-anchor="middle" fill="#000">CSCS</text>
+                </svg>
+            <?php endif; ?>
         </div>
-        <div class="school-name">Lourdes Provincial High School</div>
+        <div class="school-name">CAUAYAN SOUTH CENTRAL SCHOOL</div>
         <div class="report-title">Student Report Card</div>
         <div style="font-size: 16px; margin: 10px 0;">School Year: <?= $schoolYear ?></div>
         <div style="font-size: 16px; margin: 10px 0;">Report Generated: <?= $reportDate ?></div>
@@ -157,9 +156,9 @@
         </div>
         <div class="info-row">
             <div class="info-label">Grade & Section:</div>
-            <div class="info-value">Grade <?= esc($student['grade_level']) ?> - <?= esc($student['section_name'] ?? 'Not Assigned') ?></div>
+            <div class="info-value"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?> - <?= esc($student['section_name'] ?? 'Not Assigned') ?></div>
             <div class="info-label">Adviser:</div>
-            <div class="info-value"><?= esc($teacher['first_name'] . ' ' . $teacher['last_name']) ?></div>
+            <div class="info-value"><?= esc($student['adviser_name'] ?? 'Not Assigned') ?></div>
         </div>
     </div>
 
@@ -167,38 +166,47 @@
         <thead>
             <tr>
                 <th rowspan="2">Subject</th>
-                <th colspan="4">Quarterly Grades</th>
+                <th colspan="3">Term Grades</th>
                 <th rowspan="2">Final Grade</th>
                 <th rowspan="2">Remarks</th>
             </tr>
             <tr>
-                <th>1st</th>
-                <th>2nd</th>
-                <th>3rd</th>
-                <th>4th</th>
+                <th>Term 1</th>
+                <th>Term 2</th>
+                <th>Term 3</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($subjects as $subject): ?>
             <tr>
                 <td class="subject-name"><?= esc($subject['subject_name']) ?></td>
-                <?php for ($quarter = 1; $quarter <= 4; $quarter++): ?>
+                <?php for ($term = 1; $term <= 3; $term++): ?>
                     <td>
-                        <?php 
-                        $grade = $grades[$quarter][$subject['id']] ?? null;
-                        echo $grade ? number_format($grade, 0) : '-';
-                        ?>
+                    <?php
+                    $grade = $grades[$term][$subject['id']] ?? null;
+                    if ($grade !== null) {
+                        if (is_numeric($grade)) {
+                            echo number_format((float)$grade, 0);
+                        } else {
+                            echo esc($grade);
+                        }
+                    } else {
+                        echo '-';
+                    }
+                    ?>
                     </td>
                 <?php endfor; ?>
                 <td>
                     <?php
                     $subjectGrades = [];
-                    for ($q = 1; $q <= 4; $q++) {
-                        if (isset($grades[$q][$subject['id']]) && $grades[$q][$subject['id']] !== null) {
-                            $subjectGrades[] = $grades[$q][$subject['id']];
+                    for ($t = 1; $t <= 3; $t++) {
+                        if (isset($grades[$t][$subject['id']]) && $grades[$t][$subject['id']] !== null) {
+                            $subjectGrades[] = $grades[$t][$subject['id']];
                         }
                     }
-                    $subjectFinal = !empty($subjectGrades) ? array_sum($subjectGrades) / count($subjectGrades) : 0;
+                    // Only average numeric grades, ignore symbols
+                    $numericGrades = array_filter($subjectGrades, function($g) { return is_numeric($g); });
+                    $subjectFinal = !empty($numericGrades) ? array_sum($numericGrades) / count($numericGrades) : 0;
                     echo $subjectFinal > 0 ? number_format($subjectFinal, 0) : '-';
                     ?>
                 </td>
@@ -222,7 +230,6 @@
                 <td>-</td>
                 <td>-</td>
                 <td>-</td>
-                <td>-</td>
                 <td><?= $finalAverage > 0 ? number_format($finalAverage, 1) : '-' ?></td>
                 <td><?= $finalAverage >= 75 ? 'PASSED' : ($finalAverage > 0 ? 'FAILED' : 'NO GRADE') ?></td>
             </tr>
@@ -238,18 +245,18 @@
             <div class="signature-cell">
                 <div class="signature-line"></div>
                 <div><strong>Class Adviser</strong></div>
-                <div><?= esc($teacher['first_name'] . ' ' . $teacher['last_name']) ?></div>
+                <div><?= esc($student['adviser_name'] ?? 'Not Assigned') ?></div>
             </div>
             <div class="signature-cell">
                 <div class="signature-line"></div>
                 <div><strong>Principal</strong></div>
-                <div>Lourdes Provincial High School</div>
+                <div>Cauayan South Central School</div>
             </div>
         </div>
     </div>
 
     <div class="footer">
-        <p>Lourdes Provincial High School - Student Report Card | Generated on <?= date('F j, Y \\a\\t g:i A') ?></p>
+        <p>Cauayan South Central School - Student Report Card | Generated on <?= date('F j, Y \\a\\t g:i A') ?></p>
         <p>This document contains confidential student information. Handle with care and maintain privacy.</p>
     </div>
 </body>

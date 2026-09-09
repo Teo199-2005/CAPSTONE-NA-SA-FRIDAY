@@ -1,35 +1,43 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
-use CodeIgniter\Shield\Models\UserModel;
 use CodeIgniter\Shield\Entities\User;
+use CodeIgniter\Shield\Models\UserModel;
 
 class AuthSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        $db = \Config\Database::connect();
+        helper('auth');
 
-        $users = model(UserModel::class);
-        $email = 'admin@lphs.edu';
-        $existing = $users->where('email', $email)->first();
-        if (! $existing) {
+        $users    = model(UserModel::class);
+        $email    = 'admin@lphs.edu';
+        $password = 'ChangeMe123!';
+
+        $user = $users->where('email', $email)->first();
+
+        if (! $user) {
             $user = new User([
                 'username' => 'admin',
                 'email'    => $email,
-                'password' => 'ChangeMe123!',
+                'password' => $password,
+                'active'   => 1,
             ]);
             $users->save($user);
             $userId = (int) $users->getInsertID();
-            // Assign group directly in groups_users table
-            $db->table('auth_groups_users')->ignore(true)->insert([
-                'user_id' => $userId,
-                'group'   => 'admin',
-                'created_at' => date('Y-m-d H:i:s'),
-            ]);
+        } else {
+            $userId = (int) $user->id;
+            $user->active = 1;
+            $users->save($user);
         }
+
+        sync_auth_password($userId, $email, $password);
+        ensure_user_in_group($userId, 'admin');
+
+        echo "Master admin ready: {$email} / {$password}\n";
     }
 }
-

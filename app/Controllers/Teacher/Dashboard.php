@@ -7,6 +7,7 @@ use App\Models\GradeModel;
 use App\Models\StudentModel;
 use App\Models\SubjectModel;
 use App\Models\AttendanceModel;
+use App\Models\SectionModel;
 
 class Dashboard extends BaseController
 {
@@ -17,11 +18,57 @@ class Dashboard extends BaseController
         $this->auth = auth();
     }
 
+    /**
+     * Verify that a teacher has a legitimate relationship with a student.
+     * Teacher must be either the section adviser OR have a teaching schedule for the student's section.
+     */
+    private function verifyTeacherStudentRelationship(int $teacherRecordId, int $studentId): bool
+    {
+        $db = \Config\Database::connect();
+        helper('school_year');
+        $schoolYear = get_current_school_year();
+        
+        // Get student's section
+        $student = $db->table('students')
+            ->select('section_id')
+            ->where('id', $studentId)
+            ->where('enrollment_status', 'enrolled')
+            ->get()
+            ->getRow();
+            
+        if (!$student || !$student->section_id) {
+            return false;
+        }
+        
+        $sectionId = (int) $student->section_id;
+        
+        // Check 1: Is teacher the section adviser?
+        $isAdviser = $db->table('sections')
+            ->where('id', $sectionId)
+            ->where('adviser_id', $teacherRecordId)
+            ->countAllResults();
+        
+        if ($isAdviser > 0) {
+            return true;
+        }
+        
+        // Check 2: Does teacher have a teaching schedule for this section?
+        $hasSchedule = $db->table('teacher_schedules')
+            ->where('teacher_id', $teacherRecordId)
+            ->where('section_id', $sectionId)
+            ->where('school_year', $schoolYear)
+            ->countAllResults();
+        
+        return $hasSchedule > 0;
+    }
+
     public function index()
     {
         if (!$this->auth->user()->inGroup('teacher')) {
             return redirect()->to(base_url('/'));
         }
+
+        helper('asset');
 
         $teacherId = $this->auth->id();
         $gradeModel = new GradeModel();
@@ -32,6 +79,8 @@ class Dashboard extends BaseController
         $teacherModel = new \App\Models\TeacherModel();
         $teacher = $teacherModel->where('user_id', $teacherId)->first();
 
+        $db = \Config\Database::connect();
+
         // Initialize default values
         $myStudents = [];
         $mySubjects = [];
@@ -39,6 +88,16 @@ class Dashboard extends BaseController
         $classAverages = [];
         $gradeDistribution = ['excellent' => 0, 'very_good' => 0, 'good' => 0, 'fair' => 0, 'failing' => 0];
         $quarterPerformance = [0, 0, 0, 0];
+
+        // Determine if teacher has any SNED sections (grade_level = 7)
+        $hasSnedSection = false;
+        if ($teacher) {
+            $hasSnedSection = $db->table('sections')
+                ->where('adviser_id', $teacher['id'])
+                ->where('grade_level', 7)
+                ->where('is_active', 1)
+                ->countAllResults() > 0;
+        }
 
         if ($teacher) {
             // Get students from sections where this teacher is adviser
@@ -58,7 +117,7 @@ class Dashboard extends BaseController
                     LEFT JOIN sections sec ON sec.id = s.section_id
                     WHERE g.teacher_id = ? AND g.school_year = ?
                     LIMIT 10
-                ", [$teacher['id'], '2025-2026'])->getResultArray();
+                ", [$teacher['id'], get_current_school_year()])->getResultArray();
             }
 
             // Get subjects taught by this teacher
@@ -67,7 +126,7 @@ class Dashboard extends BaseController
                 FROM grades g
                 JOIN subjects sub ON sub.id = g.subject_id
                 WHERE g.teacher_id = ? AND g.school_year = ?
-            ", [$teacher['id'], '2025-2026'])->getResultArray();
+            ", [$teacher['id'], get_current_school_year()])->getResultArray();
 
             // Get recent grades entered by this teacher
             $recentGrades = $gradeModel->db->query("
@@ -86,7 +145,7 @@ class Dashboard extends BaseController
                     SELECT AVG(grade) as avg_grade
                     FROM grades
                     WHERE teacher_id = ? AND subject_id = ? AND school_year = ? AND grade IS NOT NULL
-                ", [$teacher['id'], $subject['id'], '2025-2026'])->getRowArray();
+                ", [$teacher['id'], $subject['id'], get_current_school_year()])->getRowArray();
 
                 $classAverages[] = [
                     'subject' => $subject['subject_name'],
@@ -99,7 +158,7 @@ class Dashboard extends BaseController
                 SELECT grade
                 FROM grades
                 WHERE teacher_id = ? AND school_year = ? AND grade IS NOT NULL
-            ", [$teacher['id'], '2025-2026'])->getResultArray();
+            ", [$teacher['id'], get_current_school_year()])->getResultArray();
 
             foreach ($grades as $grade) {
                 $gradeValue = $grade['grade'];
@@ -121,16 +180,21 @@ class Dashboard extends BaseController
                 $avg = $gradeModel->db->query("
                     SELECT AVG(grade) as avg_grade
                     FROM grades
-                    WHERE teacher_id = ? AND school_year = ? AND quarter = ? AND grade IS NOT NULL
-                ", [$teacher['id'], '2025-2026', $quarter])->getRowArray();
+                    WHERE teacher_id = ? AND school_year = ? AND term = ? AND grade IS NOT NULL
+                ", [$teacher['id'], get_current_school_year(), $quarter])->getRowArray();
 
                 $quarterPerformance[$quarter - 1] = $avg['avg_grade'] ? round($avg['avg_grade'], 2) : 0;
             }
         }
 
+        // Featured poster for the teacher dashboard side column
+        $teacherPoster = featured_dashboard_poster('teacher');
+
         return view('teacher/dashboard', [
             'title' => 'Teacher Dashboard - LPHS SMS',
             'teacher' => $teacher,
+            'featuredPosterTeacher'    => $teacherPoster['path'],
+            'featuredPosterTeacherUrl' => $teacherPoster['url'],
             'myStudents' => $myStudents,
             'mySubjects' => $mySubjects,
             'recentGrades' => $recentGrades,
@@ -139,7 +203,8 @@ class Dashboard extends BaseController
             'quarterPerformance' => $quarterPerformance,
             'totalStudents' => count($myStudents),
             'totalSubjects' => count($mySubjects),
-            'currentQuarter' => $this->getCurrentQuarter()
+            'currentQuarter' => $this->getCurrentQuarter(),
+            'hasSnedSection' => $hasSnedSection
         ]);
     }
 
@@ -149,7 +214,14 @@ class Dashboard extends BaseController
     private function getCurrentQuarter()
     {
         $systemSettingModel = new \App\Models\SystemSettingModel();
-        return $systemSettingModel->getCurrentQuarter();
+        if (method_exists($systemSettingModel, 'getCurrentQuarter')) {
+            return $systemSettingModel->getCurrentQuarter();
+        }
+        $month = (int) date('n');
+        if ($month >= 6 && $month <= 8) return 1;
+        if ($month >= 9 && $month <= 11) return 2;
+        if ($month >= 12 || $month <= 3) return 3;
+        return 4;
     }
 
     public function grades()
@@ -163,6 +235,7 @@ class Dashboard extends BaseController
         $studentModel = new StudentModel();
         $subjectModel = new SubjectModel();
         $gradeModel = new GradeModel();
+        $db = \Config\Database::connect();
         
         // Get teacher record for logged-in user
         $teacher = $teacherModel->where('user_id', $teacherId)->first();
@@ -189,7 +262,7 @@ class Dashboard extends BaseController
             $totalPages = ceil($totalStudents / $perPage);
             
             // Get students from advised sections with pagination
-            $students = $studentModel->select('students.id, students.lrn, students.first_name, students.last_name, students.grade_level, sections.section_name')
+            $students = $studentModel->select('students.id, students.lrn, students.first_name, students.last_name, students.gender, students.grade_level, students.enrollment_status, sections.section_name, sections.grading_type')
                 ->join('sections', 'sections.id = students.section_id', 'left')
                 ->where('sections.adviser_id', $teacher['id'])
                 ->where('students.enrollment_status', 'enrolled')
@@ -205,19 +278,71 @@ class Dashboard extends BaseController
                     ->orderBy('subject_name', 'ASC')
                     ->findAll();
                 
-                // Get existing grades for current quarter
-                $currentQuarter = $this->getCurrentQuarter();
+            // Get existing grades for current term
+                $currentTerm = $this->getCurrentQuarter();
                 foreach ($students as $student) {
                     foreach ($subjects as $subject) {
-                        $grade = $gradeModel->where('student_id', $student['id'])
-                            ->where('subject_id', $subject['id'])
-                            ->where('teacher_id', $teacher['id'])
-                            ->where('quarter', $currentQuarter)
-                            ->where('school_year', '2025-2026')
-                            ->first();
+                        try {
+                            $grade = $gradeModel->where('student_id', $student['id'])
+                                ->where('subject_id', $subject['id'])
+                                ->where('teacher_id', $teacher['id'])
+                                ->where('term', $currentTerm)
+                                ->where('school_year', get_current_school_year())
+                                ->first();
+                        } catch (\Throwable $e) {
+                            $grade = null;
+                        }
                         
                         $studentGrades[$student['id']][$subject['id']] = $grade;
                     }
+                }
+            }
+        }
+        
+        // Get grading type for the advisory section
+        $sectionGradingType = 'numerical';
+        $gradingSymbols = [];
+        $advisorySectionId = null;
+        if ($teacher) {
+            $advisorySection = $db->table('sections')
+                ->select('id, grading_type, section_name')
+                ->where('adviser_id', $teacher['id'])
+                ->where('is_active', 1)
+                ->get()
+                ->getRowArray();
+            
+            log_message('info', "SECTION DEBUG - Advisory Section: " . json_encode($advisorySection));
+            
+            if ($advisorySection) {
+                $advisorySectionId = $advisorySection['id'];
+                $sectionGradingType = $advisorySection['grading_type'] ?? 'numerical';
+                
+                // Get grading symbols for non-numerical sections
+                if ($sectionGradingType === 'non_numerical' && $advisorySectionId) {
+                    $gradingSymbols = $db->table('section_grading_symbols')
+                        ->where('section_id', $advisorySectionId)
+                        ->where('is_active', 1)
+                        ->orderBy('display_order', 'ASC')
+                        ->get()
+                        ->getResultArray();
+                    
+                    log_message('info', 'Grading symbols from DB for section ' . $advisorySectionId . ': ' . json_encode($gradingSymbols));
+                    
+                    // Fallback to default symbols if none found
+                    if (empty($gradingSymbols)) {
+                        log_message('warning', 'No grading symbols found in DB for section ' . $advisorySectionId . ', using fallback');
+                        $gradingSymbols = [
+                            ['symbol' => 'P', 'label' => 'Proficient', 'description' => 'The student consistently demonstrates the skill independently.', 'display_order' => 1],
+                            ['symbol' => 'AP', 'label' => 'Approaching Proficiency', 'description' => 'The student is developing the skill with minimal assistance.', 'display_order' => 2],
+                            ['symbol' => 'D', 'label' => 'Developing', 'description' => 'The student is beginning to develop the skill with guidance.', 'display_order' => 3],
+                            ['symbol' => 'B', 'label' => 'Beginning', 'description' => 'The student needs significant support to develop the skill.', 'display_order' => 4],
+                            ['symbol' => 'NO/NA', 'label' => 'Not Observed / Not Applicable', 'description' => 'The skill has not been observed or is not applicable at this time.', 'display_order' => 5],
+                        ];
+                    }
+                    
+                    log_message('info', 'Final grading symbols to pass to view: ' . json_encode($gradingSymbols));
+                } else {
+                    log_message('info', "NOT loading grading symbols - gradingType: {$sectionGradingType}, sectionId: " . ($advisorySectionId ?? 'null'));
                 }
             }
         }
@@ -228,9 +353,20 @@ class Dashboard extends BaseController
             'subjects' => $subjects,
             'teacher' => $teacher,
             'studentGrades' => $studentGrades,
+            'subjectSections' => [],
             'currentQuarter' => $this->getCurrentQuarter(),
+            'gradingEnabled' => true,
+            'currentTerm' => $this->getCurrentQuarter(),
+            'isAdvisory' => true,
+            'advisoryData' => [
+                'students' => $students,
+                'studentGrades' => $studentGrades
+            ],
+            'subjectSectionsData' => [],
             'currentPage' => $currentPage,
-            'totalPages' => $totalPages
+            'totalPages' => $totalPages,
+            'sectionGradingType' => $sectionGradingType,
+            'gradingSymbols' => $gradingSymbols
         ]);
     }
 
@@ -260,11 +396,18 @@ class Dashboard extends BaseController
             return redirect()->back()->with('error', 'Teacher record not found.');
         }
 
+        $studentId = (int) $this->request->getPost('student_id');
+        
+        // SECURITY: Verify teacher-student relationship before allowing grade save
+        if (!$this->verifyTeacherStudentRelationship((int) $teacher['id'], $studentId)) {
+            return redirect()->back()->with('error', 'You are not authorized to save grades for this student.');
+        }
+
         $data = [
-            'student_id' => (int) $this->request->getPost('student_id'),
+            'student_id' => $studentId,
             'subject_id' => (int) $this->request->getPost('subject_id'),
             'teacher_id' => (int) $teacher['id'],
-            'school_year' => '2025-2026',
+            'school_year' => get_current_school_year(),
             'quarter' => (int) $this->request->getPost('quarter'),
             'grade' => (float) $this->request->getPost('grade'),
             'remarks' => $this->request->getPost('remarks')
@@ -289,41 +432,125 @@ class Dashboard extends BaseController
         $teacherModel = new \App\Models\TeacherModel();
         $teacher = $teacherModel->where('user_id', $this->auth->id())->first();
         
+        log_message('info', 'saveBulkGrades called by teacher ID: ' . ($teacher ? $teacher['id'] : 'NOT FOUND - checking user auth'));
+        
         if (!$teacher) {
+            log_message('error', 'Teacher record not found for user ID: ' . $this->auth->id());
             return redirect()->back()->with('error', 'Teacher record not found.');
         }
 
-        $grades = $this->request->getPost('grades');
-        $quarter = $this->request->getPost('quarter');
+        // Log all POST data for debugging
+        log_message('info', 'ALL POST DATA: ' . json_encode($_POST));
+        log_message('info', 'ALL RAW POST DATA: ' . file_get_contents('php://input'));
         
-        if (!$grades || !$quarter) {
-            return redirect()->back()->with('error', 'Invalid grade data.');
+        $grades = $this->request->getPost('grades');
+        $term = $this->request->getPost('term');  
+        $gradingType = $this->request->getPost('grading_type') ?? 'numerical';
+        
+        log_message('info', 'saveBulkGrades called with grades: ' . json_encode($grades) . ', term: ' . $term . ', gradingType: ' . $gradingType);
+        log_message('info', 'Grades type: ' . gettype($grades) . ', Is array: ' . (is_array($grades) ? 'yes' : 'no'));
+        
+        if (!$grades || !is_array($grades)) {
+            log_message('error', 'Invalid grade data - grades missing or empty. Posted data: ' . json_encode($_POST));
+            return redirect()->back()->with('error', 'Invalid grade data - no grades submitted.');
+        }
+        
+        if (!$term) {
+            log_message('error', 'Invalid grade data - term missing. Posted data: ' . json_encode($_POST));
+            return redirect()->back()->with('error', 'Invalid grade data - term missing.');
+        }
+
+        // Validate term
+        $term = (int) $term;
+        if ($term < 1 || $term > 4) {
+            return redirect()->back()->with('error', 'Invalid term.');
         }
 
         $gradeModel = new GradeModel();
+        $gradeModel->skipValidation(true);
         $savedCount = 0;
+        $skippedCount = 0;
+        $processedGrades = [];
         
         foreach ($grades as $studentId => $subjects) {
+            log_message('info', "Processing student {$studentId}, subjects: " . json_encode($subjects));
+            if (!is_array($subjects)) {
+                log_message('warning', "Subjects is not an array for student {$studentId}: " . gettype($subjects));
+                continue;
+            }
+            
             foreach ($subjects as $subjectId => $gradeValue) {
-                if (!empty($gradeValue) && is_numeric($gradeValue)) {
-                    $data = [
-                        'student_id' => (int) $studentId,
-                        'subject_id' => (int) $subjectId,
-                        'teacher_id' => (int) $teacher['id'],
-                        'school_year' => '2025-2026',
-                        'quarter' => (int) $quarter,
-                        'grade' => (float) $gradeValue,
-                        'remarks' => null
-                    ];
-                    
-                    if ($gradeModel->upsertGrade($data)) {
-                        $savedCount++;
+                log_message('info', "Processing subject {$subjectId}, value: '{$gradeValue}', empty: " . (empty($gradeValue) ? 'yes' : 'no'));
+                
+                // Skip empty values
+                if ($gradeValue === '' || $gradeValue === null || $gradeValue === false) {
+                    log_message('info', "Skipping empty value for student {$studentId}, subject {$subjectId}");
+                    continue;
+                }
+                
+                $processedGrades[] = ['student_id' => $studentId, 'subject_id' => $subjectId, 'value' => $gradeValue];
+                
+                $data = [
+                    'student_id' => (int) $studentId,
+                    'subject_id' => (int) $subjectId,
+                    'teacher_id' => (int) $teacher['id'],
+                    'school_year' => get_current_school_year(),
+                    'term' => $term,
+                    'remarks' => null
+                ];
+                
+                // For non-numerical grading, store the symbol as-is
+                // For numerical grading, validate and convert to float
+                if ($gradingType === 'non_numerical') {
+                    // Validate that the symbol is one of the allowed values
+                    $allowedSymbols = ['P', 'AP', 'D', 'B', 'NO/NA'];
+                    if (!in_array($gradeValue, $allowedSymbols)) {
+                        log_message('warning', "Invalid symbol received: {$gradeValue}");
+                        $skippedCount++;
+                        continue;
                     }
+                    $data['grade'] = $gradeValue;
+                } else {
+                    // Numerical grading - validate numeric value
+                    if (!is_numeric($gradeValue)) {
+                        log_message('warning', "Non-numeric grade in numerical mode: {$gradeValue}");
+                        $skippedCount++;
+                        continue;
+                    }
+                    $gradeFloat = (float) $gradeValue;
+                    if ($gradeFloat < 0 || $gradeFloat > 100) {
+                        log_message('warning', "Grade out of range: {$gradeFloat}");
+                        $skippedCount++;
+                        continue;
+                    }
+                    $data['grade'] = $gradeFloat;
+                }
+                
+                if ($gradeModel->upsertGrade($data)) {
+                    $savedCount++;
+                } else {
+                    $skippedCount++;
                 }
             }
         }
         
-        return redirect()->back()->with('success', "Successfully saved {$savedCount} grades!");
+        log_message('info', 'Final counts - Saved: ' . $savedCount . ', Skipped: ' . $skippedCount . ', Processed: ' . count($processedGrades));
+        log_message('info', 'Processed grades details: ' . json_encode($processedGrades));
+        
+        if ($savedCount > 0) {
+            return redirect()->back()->with('success', "Successfully saved {$savedCount} grade(s).");
+        } else {
+            $debugInfo = [
+                'total_processed' => count($processedGrades),
+                'saved' => $savedCount,
+                'skipped' => $skippedCount,
+                'term' => $term,
+                'grading_type' => $gradingType,
+                'first_few_grades' => array_slice($processedGrades, 0, 3),
+                'all_post_grades' => is_array($grades) ? array_slice($grades, 0, 5) : 'not_array'
+            ];
+            return redirect()->back()->with('error', 'No grades saved. Details: ' . json_encode($debugInfo));
+        }
     }
 
     public function students()
@@ -331,29 +558,77 @@ class Dashboard extends BaseController
         if (!$this->auth->user()->inGroup('teacher')) {
             return redirect()->to(base_url('/'));
         }
-        
+
         $teacherId = $this->auth->id();
         $teacherModel = new \App\Models\TeacherModel();
         $studentModel = new StudentModel();
-        
-        // Get teacher record for logged-in user
+        $db = \Config\Database::connect();
+
         $teacher = $teacherModel->where('user_id', $teacherId)->first();
-        
-        $students = [];
-        
+
+        $advisoryStudents = [];
+        $advisorySection = null;
+        $subjectSections = [];
+
         if ($teacher) {
-            // Get students from sections where this teacher is adviser
-            $students = $studentModel->select('students.*, sections.section_name')
-                ->join('sections', 'sections.id = students.section_id', 'left')
-                ->where('sections.adviser_id', $teacher['id'])
-                ->where('students.enrollment_status', 'enrolled')
-                ->orderBy('students.last_name', 'ASC')
-                ->findAll();
+            $advisorySection = $db->table('sections')
+                ->select('id, section_name, grade_level')
+                ->where('adviser_id', $teacher['id'])
+                ->get()->getRowArray();
+
+            if ($advisorySection) {
+                $advisoryStudents = $studentModel->select('students.id, students.lrn, students.first_name, students.last_name, students.gender, students.grade_level, students.enrollment_status, sections.section_name, sections.grading_type')
+                    ->join('sections', 'sections.id = students.section_id', 'left')
+                    ->where('students.section_id', $advisorySection['id'])
+                    ->where('students.enrollment_status', 'enrolled')
+                    ->orderBy('students.last_name', 'ASC')
+                    ->findAll();
+            }
+
+            $teachingSections = $db->query(
+                "SELECT DISTINCT s.id, s.section_name, s.grade_level, sub.subject_name
+                 FROM teacher_schedules ts
+                 JOIN sections s ON s.id = ts.section_id
+                 JOIN subjects sub ON sub.id = ts.subject_id
+                 WHERE ts.teacher_id = ? AND (s.adviser_id != ? OR s.adviser_id IS NULL)
+                 ORDER BY s.grade_level, s.section_name",
+                [$teacher['id'], $teacher['id']]
+            )->getResultArray();
+
+            $sectionGroups = [];
+            foreach ($teachingSections as $ts) {
+                $sectionKey = $ts['id'];
+                if (!isset($sectionGroups[$sectionKey])) {
+                    $sectionGroups[$sectionKey] = [
+                        'id' => $ts['id'],
+                        'section_name' => $ts['section_name'],
+                        'grade_level' => $ts['grade_level'],
+                        'subjects' => []
+                    ];
+                }
+                $sectionGroups[$sectionKey]['subjects'][] = $ts['subject_name'];
+            }
+
+            foreach ($sectionGroups as $section) {
+                $sectionStudents = $studentModel->select('students.id, students.lrn, students.first_name, students.last_name, students.gender, students.grade_level, students.enrollment_status, sections.section_name, sections.grading_type')
+                    ->join('sections', 'sections.id = students.section_id', 'left')
+                    ->where('students.section_id', $section['id'])
+                    ->where('students.enrollment_status', 'enrolled')
+                    ->orderBy('students.last_name', 'ASC')
+                    ->findAll();
+
+                $subjectSections[] = [
+                    'section' => $section,
+                    'students' => $sectionStudents
+                ];
+            }
         }
-        
+
         return view('teacher/students', [
             'title' => 'My Students - LPHS SMS',
-            'students' => $students,
+            'advisoryStudents' => $advisoryStudents,
+            'advisorySection' => $advisorySection,
+            'subjectSections' => $subjectSections,
             'teacher' => $teacher
         ]);
     }
@@ -376,11 +651,97 @@ class Dashboard extends BaseController
             $schedules = $scheduleModel->getTeacherSchedule($teacher['id']);
         }
         
-        return view('teacher/schedule', [
+        $db = \Config\Database::connect();
+        $sections = $db->table('sections')->select('id, section_name, grade_level')->orderBy('grade_level', 'ASC')->orderBy('section_name', 'ASC')->get()->getResultArray();
+        $subjects = [];
+        if ($teacher) {
+            $subjects = $db->query('SELECT DISTINCT sub.id, sub.subject_name FROM subjects sub JOIN teacher_schedules ts ON ts.subject_id = sub.id WHERE ts.teacher_id = ?', [$teacher['id']])->getResultArray();
+        }
+
+        return view('teacher/schedule_view', [
             'title' => 'My Schedule - LPHS SMS',
             'teacher' => $teacher,
-            'schedules' => $schedules
+            'schedules' => $schedules,
+            'subjects' => $subjects,
+            'sections' => $sections
         ]);
+    }
+
+    public function manageSchedule()
+    {
+        if (!$this->auth->user()->inGroup('teacher')) {
+            return redirect()->to(base_url('/'));
+        }
+        
+        $teacherId = $this->auth->id();
+        $teacherModel = new \App\Models\TeacherModel();
+        $scheduleModel = new \App\Models\TeacherScheduleModel();
+        
+        // Get teacher record
+        $teacher = $teacherModel->where('user_id', $teacherId)->first();
+        $schedules = [];
+        
+        if ($teacher) {
+            $schedules = $scheduleModel->getTeacherSchedule($teacher['id']);
+        }
+        
+        $db = \Config\Database::connect();
+        $sections = $db->table('sections')->select('id, section_name, grade_level')->orderBy('grade_level', 'ASC')->orderBy('section_name', 'ASC')->get()->getResultArray();
+        $subjects = [];
+        if ($teacher) {
+            $subjects = $db->query('SELECT DISTINCT sub.id, sub.subject_name FROM subjects sub JOIN teacher_schedules ts ON ts.subject_id = sub.id WHERE ts.teacher_id = ?', [$teacher['id']])->getResultArray();
+        }
+
+        return view('teacher/schedule', [
+            'title' => 'Manage Schedule - LPHS SMS',
+            'teacher' => $teacher,
+            'schedules' => $schedules,
+            'subjects' => $subjects,
+            'sections' => $sections
+        ]);
+    }
+
+    public function saveSchedule()
+    {
+        if (!$this->auth->user()->inGroup('teacher')) {
+            return redirect()->to(base_url('/'));
+        }
+        
+        $teacherId = $this->auth->id();
+        $teacherModel = new \App\Models\TeacherModel();
+        $teacher = $teacherModel->where('user_id', $teacherId)->first();
+        
+        if (!$teacher) {
+            return redirect()->back()->with('error', 'Teacher record not found.');
+        }
+
+        $scheduleData = $this->request->getPost('schedule');
+        $scheduleModel = new \App\Models\TeacherScheduleModel();
+        
+        // Delete existing schedules
+        $db = \Config\Database::connect();
+        $db->table('teacher_schedules')->where('teacher_id', $teacher['id'])->delete();
+        
+        $saved = 0;
+        if (!empty($scheduleData)) {
+            foreach ($scheduleData as $day => $slots) {
+                foreach ($slots as $timeSlot => $data) {
+                    if (!empty($data['subject_id']) && !empty($data['section_id'])) {
+                        $scheduleModel->insert([
+                            'teacher_id' => $teacher['id'],
+                            'section_id' => (int) $data['section_id'],
+                            'subject_id' => (int) $data['subject_id'],
+                            'day' => $day,
+                            'time_slot' => $timeSlot,
+                            'room' => $data['room'] ?? ''
+                        ]);
+                        $saved++;
+                    }
+                }
+            }
+        }
+        
+        return redirect()->to(base_url('teacher/schedule'))->with('success', "Schedule saved! {$saved} entries added.");
     }
 
     public function attendance()
@@ -451,8 +812,15 @@ class Dashboard extends BaseController
         
         $saved = 0;
         foreach ($attendanceData as $studentId => $status) {
+            $studentIdInt = (int) $studentId;
+            
+            // SECURITY: Verify teacher-student relationship before recording attendance
+            if (!$this->verifyTeacherStudentRelationship((int) $teacher['id'], $studentIdInt)) {
+                continue; // Skip students the teacher doesn't have a relationship with
+            }
+            
             $data = [
-                'student_id' => (int) $studentId,
+                'student_id' => $studentIdInt,
                 'teacher_id' => (int) $teacher['id'],
                 'date' => $date,
                 'status' => $status,
@@ -733,7 +1101,7 @@ class Dashboard extends BaseController
             ->findAll();
         
         // Get grades for current school year
-        $schoolYear = '2025-2026';
+        $schoolYear = get_current_school_year();
         $grades = [];
         $quarterAverages = [];
         
@@ -743,20 +1111,20 @@ class Dashboard extends BaseController
                 $grade = $gradeModel->where('student_id', $studentId)
                     ->where('subject_id', $subject['id'])
                     ->where('school_year', $schoolYear)
-                    ->where('quarter', $quarter)
+                    ->where('term', $quarter)
                     ->first();
                 
                 $quarterGrades[$subject['id']] = $grade ? $grade['grade'] : null;
             }
             $grades[$quarter] = $quarterGrades;
             
-            // Calculate quarter average
-            $validGrades = array_filter($quarterGrades, function($g) { return $g !== null; });
-            $quarterAverages[$quarter] = !empty($validGrades) ? array_sum($validGrades) / count($validGrades) : 0;
+            // Calculate quarter average - only sum numeric grades
+            $numericGrades = array_filter($quarterGrades, function($g) { return $g !== null && is_numeric($g); });
+            $quarterAverages[$quarter] = !empty($numericGrades) ? array_sum($numericGrades) / count($numericGrades) : 0;
         }
         
-        // Calculate final average
-        $validQuarters = array_filter($quarterAverages, function($avg) { return $avg > 0; });
+        // Calculate final average - filter out non-numeric values
+        $validQuarters = array_filter($quarterAverages, function($avg) { return is_numeric($avg) && $avg > 0; });
         $finalAverage = !empty($validQuarters) ? array_sum($validQuarters) / count($validQuarters) : 0;
         
         $data = [

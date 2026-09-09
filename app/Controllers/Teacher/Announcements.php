@@ -21,17 +21,41 @@ class Announcements extends BaseController
         }
         
         $model = new AnnouncementModel();
+        $db = \Config\Database::connect();
+        $userId = $this->auth->user()->id;
         
-        // Get announcements for teachers (from admin) and all announcements
-        $announcements = $model->where('target_roles', 'teacher')
-                              ->orWhere('target_roles', 'all')
-                              ->orWhere('target_roles', 'admin')
-                              ->orderBy('created_at', 'DESC')
-                              ->findAll();
+        // Get announcements with read status
+        $announcements = $db->query("
+            SELECT a.*, 
+                   CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END as is_read
+            FROM announcements a
+            LEFT JOIN announcement_reads ar ON ar.announcement_id = a.id AND ar.user_id = ?
+            WHERE a.target_roles IN ('teacher', 'all', 'admin')
+            ORDER BY a.created_at DESC
+        ", [$userId])->getResultArray();
+        
+        // Get grade recommendation notifications
+        $gradeRecommendations = [];
+        try {
+            $gradeRecommendations = $db->query("
+                SELECT * FROM notifications
+                WHERE user_id = ? AND type = 'grade_recommendation'
+                ORDER BY created_at DESC
+            ", [$userId])->getResultArray();
+        } catch (\Exception $e) {
+            log_message('error', 'Error fetching grade recommendations: ' . $e->getMessage());
+        }
+        
+        // Count unread
+        $unreadCount = count(array_filter($announcements, fn($a) => !$a['is_read']));
+        $unreadGradeRecs = !empty($gradeRecommendations) ? count(array_filter($gradeRecommendations, fn($g) => !$g['is_read'])) : 0;
         
         return view('teacher/announcements', [
-            'title' => 'Announcements - LPHS SMS',
-            'announcements' => $announcements
+            'title' => 'Announcements - CSCS SMS',
+            'announcements' => $announcements,
+            'gradeRecommendations' => $gradeRecommendations,
+            'unreadCount' => $unreadCount,
+            'unreadGradeRecs' => $unreadGradeRecs
         ]);
     }
 
@@ -60,7 +84,79 @@ class Announcements extends BaseController
 
         return redirect()->back()->with('success', 'Announcement posted to students.');
     }
+
+    public function view($id)
+    {
+        if (! $this->auth->user()->inGroup('teacher')) {
+            return redirect()->to(base_url('/'));
+        }
+
+        $model = new AnnouncementModel();
+        $announcement = $model->find($id);
+
+        if (!$announcement) {
+            return redirect()->to('teacher/announcements')->with('error', 'Announcement not found.');
+        }
+
+        // Mark as read
+        $db = \Config\Database::connect();
+        $userId = $this->auth->user()->id;
+        $exists = $db->table('announcement_reads')->where(['announcement_id' => $id, 'user_id' => $userId])->get()->getRow();
+        if (!$exists) {
+            $db->table('announcement_reads')->insert(['announcement_id' => $id, 'user_id' => $userId, 'read_at' => date('Y-m-d H:i:s')]);
+        }
+
+        return view('teacher/announcement_view', [
+            'title' => $announcement['title'] . ' - CSCS SMS',
+            'announcement' => $announcement
+        ]);
+    }
+
+    public function getUnreadCount()
+    {
+        if (! $this->auth->user()->inGroup('teacher')) {
+            return $this->response->setJSON(['count' => 0]);
+        }
+
+        $db = \Config\Database::connect();
+        $userId = $this->auth->user()->id;
+        
+        $count = $db->query("
+            SELECT COUNT(*) as count
+            FROM announcements a
+            LEFT JOIN announcement_reads ar ON ar.announcement_id = a.id AND ar.user_id = ?
+            WHERE a.target_roles IN ('teacher', 'all', 'admin') AND ar.id IS NULL
+        ", [$userId])->getRow()->count;
+        
+        return $this->response->setJSON(['count' => (int)$count]);
+    }
+    
+    public function markGradeRecAsRead()
+    {
+        if (! $this->auth->user()->inGroup('teacher')) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Unauthorized']);
+        }
+        
+        $notificationId = $this->request->getPost('notification_id');
+        
+        if (!$notificationId) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Notification ID required']);
+        }
+        
+        $db = \Config\Database::connect();
+        $updated = $db->table('notifications')
+            ->where('id', $notificationId)
+            ->where('user_id', $this->auth->user()->id)
+            ->update(['is_read' => 1, 'updated_at' => date('Y-m-d H:i:s')]);
+        
+        if ($updated) {
+            return $this->response->setJSON(['success' => true]);
+        }
+        
+        return $this->response->setJSON(['success' => false, 'error' => 'Failed to update']);
+    }
 }
+
 
 
 

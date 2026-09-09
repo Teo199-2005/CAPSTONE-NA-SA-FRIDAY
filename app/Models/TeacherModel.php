@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -16,7 +15,12 @@ class TeacherModel extends Model
         'employee_id', 'user_id', 'first_name', 'middle_name', 'last_name', 'suffix',
         'gender', 'date_of_birth', 'contact_number', 'email', 'address',
         'department', 'position', 'specialization', 'date_hired',
-        'employment_status', 'photo_path', 'license_number'
+        'employment_status', 'photo_path', 'license_number',
+        'tin', 'personnel_category', 'fund_source', 'designation', 'nature_of_appointment',
+        'baccalaureate_degree', 'prc_specialization', 'prc_major_units_percent', 'minor',
+        'masters_degree', 'government_employee_no', 'hiring_arrangement', 'religion',
+        'ethnic_group', 'item_status', 'civil_status', 'philsys_number', 'eligibility',
+        'date_first_service', 'date_first_service_new_station',
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -37,14 +41,29 @@ class TeacherModel extends Model
         'employee_id' => 'permit_empty|is_unique[teachers.employee_id,id,{id}]',
         'first_name' => 'required|max_length[100]',
         'last_name' => 'required|max_length[100]',
-        'gender' => 'required|in_list[Male,Female]',
+        'gender' => 'permit_empty|in_list[Male,Female]',
         'email' => 'required|valid_email|is_unique[teachers.email,id,{id}]',
-        'employment_status' => 'in_list[active,inactive,resigned,terminated]',
-        'position' => 'max_length[100]',
+        'employment_status' => 'permit_empty|in_list[active,inactive,on_leave,resigned,terminated]',
+        'position' => 'permit_empty|max_length[100]',
         'license_number' => 'permit_empty|max_length[20]'
     ];
     protected $validationMessages = [];
     protected $skipValidation = false;
+    
+    /**
+     * Update validation rules for profile updates
+     */
+    public function getProfileUpdateRules($teacherId)
+    {
+        return [
+            'first_name' => 'required|max_length[100]',
+            'middle_name' => 'permit_empty|max_length[100]',
+            'last_name' => 'required|max_length[100]',
+            'email' => "required|valid_email|max_length[255]|is_unique[teachers.email,id,{$teacherId}]",
+            'contact_number' => 'permit_empty|max_length[20]',
+            'address' => 'permit_empty|max_length[255]'
+        ];
+    }
     protected $cleanValidationRules = true;
 
     // Callbacks
@@ -140,12 +159,24 @@ class TeacherModel extends Model
      */
     public function getAvailableAdvisers()
     {
-        // Get all active teachers (since none are currently assigned)
-        return $this->select('id, first_name, last_name, email, license_number')
-                   ->where('employment_status', 'active')
-                   ->where('deleted_at IS NULL')
-                   ->orderBy('first_name', 'ASC')
-                   ->orderBy('last_name', 'ASC')
-                   ->findAll();
+        // DEBUG: Show all teachers with their assignment status
+        $db = \Config\Database::connect();
+        
+        $query = "SELECT 
+                    t.id, 
+                    t.first_name, 
+                    t.last_name, 
+                    t.email, 
+                    t.license_number, 
+                    t.employment_status,
+                    s.section_name as assigned_section,
+                    s.grade_level as assigned_grade
+                  FROM teachers t
+                  LEFT JOIN sections s ON s.adviser_id = t.id
+                  WHERE t.employment_status = 'active' 
+                  AND t.deleted_at IS NULL
+                  ORDER BY t.first_name ASC, t.last_name ASC";
+        
+        return $db->query($query)->getResultArray();
     }
 }

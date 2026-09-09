@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -38,7 +37,7 @@ class FixDemoAccountsSeeder extends Seeder
             'lrn' => 'DEMO-STUDENT-001',
             'first_name' => 'Demo',
             'last_name' => 'Student',
-            'grade_level' => 10,
+            'grade_level' => 6,
             'section' => 'Aristotle',
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')

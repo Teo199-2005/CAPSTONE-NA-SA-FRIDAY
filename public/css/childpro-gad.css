@@ -1,0 +1,470 @@
+/* ============================================
+   CHILDPRO / GAD – Public Pages
+   Matches school-about.css design profile
+   ============================================ */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #1e3a8a !important;
+}
+
+#landing.childpro-gad-page,
+.childpro-gad-page {
+  position: relative;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+#landing .childpro-gad-page .landing-section-inner {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding-left: clamp(1.25rem, 6vw, 10rem) !important;
+  padding-right: clamp(1.25rem, 6vw, 10rem) !important;
+  box-sizing: border-box !important;
+}
+
+/* ── Hero ── matches about-page-hero */
+#landing .cg-hero {
+  position: relative;
+  overflow: hidden;
+  margin-top: 0.75rem !important;
+  padding: clamp(4rem, 8vw, 6rem) 0 clamp(3rem, 5vw, 4.25rem) !important;
+  background:
+    radial-gradient(120% 120% at 15% 0%, rgba(96, 165, 250, 0.35) 0%, rgba(96, 165, 250, 0) 55%),
+    radial-gradient(120% 120% at 85% 100%, rgba(251, 191, 36, 0.18) 0%, rgba(251, 191, 36, 0) 58%),
+    linear-gradient(135deg, #1e3a8a 0%, #1e40af 48%, #172554 100%) !important;
+  color: #fff;
+  text-align: center;
+}
+
+#landing .cg-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 38px 38px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+#landing .cg-hero__inner {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding-left: clamp(1.25rem, 6vw, 10rem) !important;
+  padding-right: clamp(1.25rem, 6vw, 10rem) !important;
+  box-sizing: border-box !important;
+}
+
+#landing .cg-hero__title {
+  color: #fff !important;
+  margin-bottom: 0.9rem;
+  font-size: clamp(2rem, 5.4vw, 4rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.06 !important;
+  text-shadow: 0 14px 36px rgba(2, 6, 23, 0.45);
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#landing .cg-hero__desc {
+  color: rgba(255, 255, 255, 0.96) !important;
+  font-size: clamp(1.02rem, 1.9vw, 1.35rem) !important;
+  font-weight: 500 !important;
+  line-height: 1.7;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+#landing .cg-hero__accent {
+  width: min(140px, 28vw);
+  height: 4px;
+  border-radius: 999px;
+  margin: 1.25rem auto 0;
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 45%, #60a5fa 100%);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+/* ── Hero with image (overrides centered text) ── */
+#landing .cg-hero--with-image {
+  margin-top: 0.75rem !important;
+  padding: 0 !important;
+  text-align: left;
+  background: #0b1530 !important;
+}
+
+#landing .cg-hero--with-image::before {
+  display: none;
+}
+
+#landing .cg-hero__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1983 / 793;
+  background: #0b1530;
+  overflow: hidden;
+}
+
+#landing .cg-hero__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#landing .cg-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(15, 23, 42, 0.92) 0%,
+    rgba(15, 23, 42, 0.55) 50%,
+    rgba(15, 23, 42, 0.15) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2.5rem clamp(1.25rem, 6vw, 6rem);
+}
+
+#landing .cg-hero--with-image .cg-hero__title {
+  font-size: clamp(1.75rem, 4vw, 3.25rem);
+  text-align: left;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 900px;
+}
+
+#landing .cg-hero--with-image .cg-hero__desc {
+  text-align: left;
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 750px;
+}
+
+/* ── Content Sections ── matches section-light / section-dark */
+#landing .cg-section {
+  padding: 5rem 0 !important;
+}
+
+#landing .cg-section.section-light {
+  background-color: #ffffff !important;
+  background-image: url("https://www.transparenttextures.com/patterns/batthern.png") !important;
+  background-size: auto !important;
+  background-repeat: repeat !important;
+}
+
+#landing .cg-section.section-dark {
+  background-color: #dbeafe !important;
+  background-image: url("https://www.transparenttextures.com/patterns/dotnoise-light-grey.png") !important;
+  background-size: auto !important;
+  background-repeat: repeat !important;
+}
+
+#landing .cg-section__inner {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding-left: clamp(1.25rem, 6vw, 10rem) !important;
+  padding-right: clamp(1.25rem, 6vw, 10rem) !important;
+  box-sizing: border-box !important;
+}
+
+/* Alternate layout: odd = media left (content right), even = media right (content left) */
+#landing .cg-section__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 3vw, 4rem);
+  align-items: center;
+}
+
+#landing .cg-section__body--alt {
+  direction: rtl;
+}
+
+#landing .cg-section__body--alt > * {
+  direction: ltr;
+}
+
+#landing .cg-section__content {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-radius: 16px !important;
+  padding: 2rem 2.25rem !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+#landing .cg-section.section-dark .cg-section__content {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+#landing .cg-section__content .section-title {
+  font-size: 2.75rem !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
+  margin-bottom: 1.5rem !important;
+  color: #0f172a !important;
+  letter-spacing: -0.025em !important;
+  position: relative;
+  padding-bottom: 1.5rem;
+  text-transform: capitalize !important;
+}
+
+/* Suppress the global app.css gray line through the title */
+#landing .cg-section__content .section-title::before {
+  content: none !important;
+  display: none !important;
+}
+
+#landing .cg-section__content .section-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 30%, #60a5fa 70%, #3b82f6 100%);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+#landing .cg-section__content .section-subtitle {
+  font-size: 1.375rem !important;
+  font-weight: 500 !important;
+  color: #475569 !important;
+  margin-bottom: 3rem !important;
+  line-height: 1.5 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: capitalize !important;
+}
+
+#landing .cg-section__content .section-text {
+  font-size: 1.05rem !important;
+  color: #475569 !important;
+  line-height: 1.7 !important;
+  margin: 0 !important;
+}
+
+/* Media block — matches vision-mission-panel design */
+#landing .cg-section__media {
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(30, 64, 175, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+  background: #e2e8f0;
+  border: 1px solid rgba(30, 64, 175, 0.1) !important;
+  transition: all 0.3s ease;
+}
+
+#landing .cg-section__media:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+#landing .cg-section__media img,
+#landing .cg-section__media video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: cover;
+}
+
+#landing .cg-section__media iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+}
+
+/* ── Section divider (removed) ── */
+#landing .section-divider {
+  display: none;
+}
+
+/* ── Empty state ── */
+#landing .cg-empty {
+  text-align: center;
+  padding: 6rem 2rem;
+}
+
+#landing .cg-empty i {
+  font-size: 4rem;
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+#landing .cg-empty h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #475569;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+#landing .cg-empty p {
+  font-size: 1.05rem;
+  color: #94a3b8;
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+
+/* ── Announcement Strip for CHILDPRO/GAD ── */
+/* Matches landing.php .landing-announcement-strip structure + childpro-gad.css layout */
+#announcement-strip-cg {
+  background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 45%, #1d4ed8 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+  border-bottom: 2px solid #fbbf24 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+#announcement-strip-cg .landing-announcement-strip__viewport {
+  overflow: hidden !important;
+  width: 100% !important;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 3%, #000 97%, transparent 100%) !important;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 3%, #000 97%, transparent 100%) !important;
+}
+#announcement-strip-cg .landing-announcement-strip__track {
+  display: flex !important;
+  width: max-content !important;
+  min-width: 200% !important;
+  animation: cgStripScroll 60s linear infinite !important;
+  will-change: transform !important;
+}
+#announcement-strip-cg .landing-announcement-strip__group {
+  min-width: 50vw !important;
+  justify-content: center !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+#announcement-strip-cg .announcement-strip-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  padding: 0.5rem 1.75rem !important;
+  white-space: nowrap !important;
+}
+#announcement-strip-cg .announcement-strip-icon {
+  color: #fbbf24 !important;
+  font-size: 1.05rem !important;
+  flex-shrink: 0 !important;
+}
+#announcement-strip-cg .announcement-strip-text {
+  white-space: nowrap !important;
+  font-weight: 600 !important;
+  font-size: clamp(0.8rem, 1.6vw, 0.95rem) !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.02em !important;
+}
+#announcement-strip-cg .announcement-strip-text a {
+  color: #fbbf24 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  text-decoration-thickness: 1px !important;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease !important;
+}
+#announcement-strip-cg .announcement-strip-text a:hover {
+  color: #fff !important;
+  text-decoration-color: #fbbf24 !important;
+}
+#announcement-strip-cg .announcement-strip-sep {
+  color: rgba(251, 191, 36, 0.9) !important;
+  font-size: 0.5rem !important;
+  font-weight: 600 !important;
+  padding: 0 0.15rem !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
+}
+@keyframes cgStripScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #announcement-strip-cg .landing-announcement-strip__track {
+    animation: none !important;
+    justify-content: center !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+  #announcement-strip-cg .landing-announcement-strip__group[aria-hidden="true"] {
+    display: none !important;
+  }
+}
+
+/* ── Responsive ── */
+@media (max-width: 992px) {
+  #landing .cg-section__body {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  #landing .cg-section__body--alt {
+    direction: ltr;
+  }
+
+  #landing .cg-hero__stage {
+    aspect-ratio: 16 / 9;
+    min-height: 300px;
+  }
+
+  #landing .cg-hero__overlay {
+    padding: 1.5rem;
+  }
+
+  #landing .cg-section__media {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  #landing .cg-section__content .section-title {
+    font-size: 2rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  #landing .cg-hero__stage {
+    aspect-ratio: 3 / 4;
+    min-height: 260px;
+  }
+
+  #landing .cg-section {
+    padding: 3rem 0 !important;
+  }
+
+  #landing .cg-section__media {
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  #landing .cg-empty {
+    padding: 4rem 1.5rem;
+  }
+
+  #landing .cg-empty i {
+    font-size: 3rem;
+  }
+
+  #landing .cg-section__content .section-subtitle {
+    font-size: 1.1rem !important;
+  }
+}
+

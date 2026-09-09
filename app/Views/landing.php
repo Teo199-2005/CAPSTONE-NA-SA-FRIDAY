@@ -1,19 +1,542 @@
-<?= $this->extend('layout') ?>
+﻿<?= $this->extend('layout') ?>
 <?= $this->section('content') ?>
 
+<!-- Full-page load overlay (landing only) -->
+<style>
+  #landingPageLoader {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(1.25rem, 4vw, 2rem);
+    padding: 1.5rem;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% 20%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 90% 70% at 80% 100%, rgba(251, 191, 36, 0.18) 0%, transparent 45%),
+      linear-gradient(155deg, #0b1220 0%, #132447 38%, #1e3a8a 72%, #172554 100%);
+    transition:
+      opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0.55s,
+      transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #landingPageLoader.is-done {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(1.03);
+  }
+  #landingPageLoader .landing-page-loader__dial {
+    position: relative;
+    width: min(92vw, 360px);
+    height: min(92vw, 360px);
+    max-width: 360px;
+    max-height: 360px;
+  }
+  #landingPageLoader .landing-page-loader__ring {
+    position: absolute;
+    border-radius: 50%;
+    inset: 0;
+    box-sizing: border-box;
+  }
+  #landingPageLoader .landing-page-loader__ring--outer {
+    border: 14px solid rgba(255, 255, 255, 0.09);
+    border-top-color: #fbbf24;
+    border-right-color: #f59e0b;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 0 72px rgba(251, 191, 36, 0.28),
+      0 24px 48px rgba(0, 0, 0, 0.35);
+    animation: landingLoaderSpin 0.95s cubic-bezier(0.6, 0.05, 0.35, 1) infinite;
+  }
+  #landingPageLoader .landing-page-loader__ring--mid {
+    inset: 20px;
+    border: 8px solid rgba(255, 255, 255, 0.05);
+    border-bottom-color: rgba(96, 165, 250, 0.85);
+    border-left-color: rgba(59, 130, 246, 0.55);
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+    animation: landingLoaderSpin 1.45s linear infinite reverse;
+  }
+  #landingPageLoader .landing-page-loader__logo-shell {
+    position: absolute;
+    inset: clamp(52px, 16vw, 68px);
+    border-radius: 50%;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow:
+      0 24px 56px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  #landingPageLoader .landing-page-loader__logo {
+    width: 72%;
+    height: 72%;
+    max-width: 160px;
+    max-height: 160px;
+    object-fit: contain;
+    border-radius: 50%;
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+  }
+  #landingPageLoader .landing-page-loader__label {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.88);
+    text-align: center;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  }
+  #landingPageLoader .landing-page-loader__sub {
+    margin: -0.75rem 0 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
+    font-weight: 500;
+    color: rgba(251, 191, 36, 0.9);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  @keyframes landingLoaderSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #landingPageLoader .landing-page-loader__ring--outer,
+    #landingPageLoader .landing-page-loader__ring--mid {
+      animation-duration: 2.4s;
+    }
+    #landingPageLoader.is-done {
+      transition-duration: 0.2s;
+    }
+  }
+  html.landing-loader-active body {
+    overflow: hidden;
+  }
+</style>
+<div id="landingPageLoader" class="landing-page-loader" role="progressbar" aria-busy="true" aria-valuetext="Loading">
+  <div class="landing-page-loader__dial">
+    <div class="landing-page-loader__ring landing-page-loader__ring--outer" aria-hidden="true"></div>
+    <div class="landing-page-loader__ring landing-page-loader__ring--mid" aria-hidden="true"></div>
+    <div class="landing-page-loader__logo-shell">
+      <img
+        src="<?= asset_url('LPHS2.png') ?>"
+        alt="Cauayan South Central School"
+        class="landing-page-loader__logo"
+        width="160"
+        height="160"
+        decoding="async"
+        fetchpriority="high"
+      />
+    </div>
+  </div>
+  <p class="landing-page-loader__label">Cauayan South Central School</p>
+  <p class="landing-page-loader__sub">School Management System</p>
+</div>
+
 <!-- Landing-specific CSS -->
-<link href="<?= base_url('css/landing.css') ?>" rel="stylesheet" />
+<link href="<?= asset_url('css/landing.css') ?>" rel="stylesheet" />
 <style>
 /* Professional Typography & Layout */
-#landing { font-family: 'Inter', sans-serif; line-height: 1.6; }
+#landing {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
 #landing .container { max-width: 1200px !important; margin: 0 auto !important; padding: 0 2rem !important; }
+
+/* Wide content band â€” matches Vision & Mission horizontal span */
+#landing .landing-section-inner {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding-left: clamp(1.25rem, 6vw, 10rem) !important;
+  padding-right: clamp(1.25rem, 6vw, 10rem) !important;
+  box-sizing: border-box !important;
+}
 #landing section { padding: 5rem 0 !important; }
 #landing #about-lnhs { padding: 3rem 0 !important; }
 
 /* Typography Hierarchy */
-#landing .hero-title { font-size: 4.5rem !important; font-weight: 900 !important; line-height: 1.02 !important; margin-bottom: 2rem !important; color: white !important; letter-spacing: -0.04em !important; text-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;  }
-#landing .hero-subtitle { font-size: 2.25rem !important; font-weight: 700 !important; margin-bottom: 2rem !important; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important; letter-spacing: -0.02em !important; text-shadow: none !important; text-transform: uppercase !important; font-family: 'Inter', sans-serif !important; }
-#landing .hero-description { font-size: 1.5rem !important; font-weight: 500 !important; line-height: 1.55 !important; max-width: 900px !important; margin: 0 auto 3.5rem !important; color: rgba(255, 255, 255, 0.95) !important; letter-spacing: -0.01em !important; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important; }
+#landing .sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+#landing .hero-description { font-size: 1.5rem !important; font-weight: 500 !important; line-height: 1.55 !important; max-width: 900px !important; margin: 0 auto 2rem !important; color: rgba(255, 255, 255, 0.98) !important; letter-spacing: -0.01em !important; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35) !important; }
+
+/* Hero slideshow */
+#landing .hero.hero-slideshow {
+  background: #0b1530 !important;
+  position: relative !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: unset !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
+}
+#landing .hero-slideshow__stage {
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 1983 / 793 !important;
+  background: #0b1530 !important;
+  margin-top: 1rem !important;
+}
+#landing .hero-slide {
+  position: absolute !important;
+  inset: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.85s ease-in-out !important;
+  pointer-events: none !important;
+}
+#landing .hero-slide.is-active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 1 !important;
+}
+#landing .hero-banner-img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  object-fit: cover !important;
+  object-position: var(--hero-object-position, center center) !important;
+  vertical-align: top !important;
+}
+#landing .hero-slideshow__dots {
+  position: absolute !important;
+  bottom: 5.5rem !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 4 !important;
+  display: flex !important;
+  gap: 0.5rem !important;
+  padding: 0.35rem 0.65rem !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  border-radius: 999px !important;
+  backdrop-filter: blur(6px) !important;
+}
+#landing .hero-slideshow__dot {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(255, 255, 255, 0.85) !important;
+  background: transparent !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  transition: background 0.2s, transform 0.2s !important;
+}
+#landing .hero-slideshow__dot.is-active {
+  background: #fbbf24 !important;
+  border-color: #fbbf24 !important;
+  transform: scale(1.15) !important;
+}
+#landing .landing-announcement-strip {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 6 !important;
+  background: linear-gradient(90deg, #1e3a8a 0%, #2563eb 45%, #1d4ed8 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
+  border-bottom: 2px solid #fbbf24 !important;
+}
+#landing .landing-announcement-strip__viewport {
+  overflow: hidden !important;
+  width: 100% !important;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 3%, #000 97%, transparent 100%) !important;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 3%, #000 97%, transparent 100%) !important;
+}
+#landing .landing-announcement-strip__track {
+  display: flex !important;
+  width: max-content !important;
+  /* Ensure the track is at least twice the viewport so duplicated groups fully cover the strip
+     even when announcement text is short. This keeps the marquee seamless. */
+  min-width: 200% !important;
+  animation: landingStripScroll var(--landing-strip-duration, 32s) linear infinite !important;
+  will-change: transform !important;
+}
+#landing .landing-announcement-strip__group {
+  /* Each duplicated group should cover half the viewport so two groups span full width.
+     This guarantees the marquee fills left-to-right even for very short text. */
+  min-width: 50vw !important;
+  justify-content: center !important;
+}
+#landing .landing-announcement-strip__group {
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+#landing .landing-announcement-strip__item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  padding: 0.5rem 1.75rem !important;
+  white-space: nowrap !important;
+  font-size: clamp(0.8rem, 1.6vw, 0.95rem) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.2 !important;
+}
+#landing .landing-announcement-strip__icon {
+  color: #fbbf24 !important;
+  font-size: 1.05rem !important;
+  flex-shrink: 0 !important;
+}
+#landing .landing-announcement-strip__text {
+  white-space: nowrap !important;
+}
+#landing .landing-announcement-strip__text .announcement-link {
+  color: #fbbf24 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease !important;
+}
+#landing .landing-announcement-strip__text .announcement-link:hover {
+  color: #fff !important;
+  text-decoration-color: #fbbf24 !important;
+}
+#landing .landing-announcement-strip__sep {
+  color: rgba(251, 191, 36, 0.65) !important;
+  font-size: 0.55rem !important;
+  padding: 0 0.25rem !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
+}
+@keyframes landingStripScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #landing .landing-announcement-strip__track {
+    animation: none !important;
+    justify-content: center !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+  #landing .landing-announcement-strip__group[aria-hidden="true"] {
+    display: none !important;
+  }
+  #landing .hero-slide {
+    transition: none !important;
+  }
+}
+
+/* Minimal hero nav arrows */
+.hero-nav {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: rgba(0,0,0,0.28) !important; /* reduced opacity */
+  border: none !important;
+  color: #fff !important;
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 10px !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  backdrop-filter: blur(4px) !important;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35) !important;
+}
+.hero-nav i { font-size: 1.2rem !important; }
+.hero-nav.hero-prev { left: 18px !important; }
+.hero-nav.hero-next { right: 18px !important; }
+
+#landing .hero-nav {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background: rgba(0, 0, 0, 0.36) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  #landing .hero-nav i {
+    font-size: 0.95rem !important;
+  }
+
+  #landing .hero-nav.hero-prev {
+    left: 10px !important;
+  }
+
+  #landing .hero-nav.hero-next {
+    right: 10px !important;
+  }
+
+/* Hide the dot radio indicators visually (we keep them for accessibility) */
+.hero-slideshow__dots { display: none !important; }
+#hero-lifelines-styles {
+  display: none;
+}
+/* Lifelines styles (below hero) */
+.hero { position: relative !important; }
+.hero-lifelines {
+  position: absolute !important;
+  top: 50px !important; /* moved further down */
+  right: 14px !important;
+  display: flex !important;
+  gap: 0.4rem !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding: 0.28rem 0.45rem !important; /* slightly smaller */
+  background: rgba(0,0,0,0.36) !important;
+  border-radius: 8px !important;
+  z-index: 25 !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35) !important;
+}
+.hero-lifelines .lifeline-card {
+  background: rgba(0,0,0,0.45) !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  gap: 0.45rem !important;
+  align-items: center !important;
+  padding: 0.32rem 0.5rem !important; /* reduced */
+  min-width: 0 !important;
+  width: auto !important;
+}
+.hero-lifelines .lifeline-icon i {
+  font-size: 0.95rem !important; /* a little smaller */
+  color: #22c55e !important;
+}
+.hero-lifelines .lifeline-body .lifeline-title {
+  font-weight: 700 !important;
+  color: #fff !important;
+  font-size: 0.72rem !important; /* slightly smaller */
+}
+.hero-lifelines .lifeline-body .lifeline-status {
+  font-weight: 800 !important;
+  color: #22c55e !important;
+  font-size: 0.82rem !important; /* slightly smaller */
+}
+.hero-lifelines .lifeline-card.is-down { background: rgba(255,0,0,0.08) !important; }
+.hero-lifelines .lifeline-card.is-down .lifeline-icon i,
+.hero-lifelines .lifeline-card.is-down .lifeline-body .lifeline-status { color: #ff4d4f !important; }
+@media (max-width: 767.98px) {
+  /* On small screens place lifelines as a centered thin strip above the hero content */
+  .hero-lifelines {
+    position: static !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 0.35rem !important;
+    width: 100% !important;
+    margin: 0.5rem 0 0 0 !important;
+    padding: 0.25rem 0.35rem !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    background: rgba(0,0,0,0.45) !important;
+  }
+  .hero-lifelines .lifeline-card {
+    width: auto !important;
+    padding: 0.25rem 0.35rem !important;
+  }
+  .hero-lifelines .lifeline-icon i {
+    font-size: 0.82rem !important;
+  }
+  .hero-lifelines .lifeline-body .lifeline-title {
+    font-size: 0.68rem !important;
+  }
+  .hero-lifelines .lifeline-body .lifeline-status {
+    font-size: 0.76rem !important;
+  }
+}
+#landing .hero-caption {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 3 !important;
+  padding: 1.25rem 1.5rem 1.5rem !important;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.45) 70%, transparent 100%) !important;
+}
+#landing .hero-caption .hero-description {
+  margin: 0 auto !important;
+  max-width: 900px !important;
+  font-size: clamp(0.95rem, 2vw, 1.25rem) !important;
+}
+@media (max-width: 768px) {
+  #landing .hero-slideshow__stage {
+    aspect-ratio: 16 / 9 !important;
+    min-height: 260px !important;
+    max-height: 300px !important;
+    background: #0b1530 !important;
+  }
+  #landing .hero-slide,
+  #landing .hero-banner-img {
+    height: 100% !important;
+  }
+  #landing .hero-banner-img {
+    object-fit: cover !important;
+    object-position: var(--hero-object-position, center center) !important;
+    background: #0b1530 !important;
+  }
+  /* On small screens keep the announcement strip visible. We center and allow wrapping
+     to keep content legible on narrow viewports. */
+  #landing .landing-announcement-strip {
+    display: block !important;
+  }
+  #landing .hero-slideshow__dots {
+    bottom: 4.25rem !important;
+    gap: 0.4rem !important;
+    padding: 0.3rem 0.55rem !important;
+  }
+  #landing .hero-slideshow__dot {
+    width: 8px !important;
+    height: 8px !important;
+  }
+  #landing .hero-caption {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: linear-gradient(to top, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0.62) 64%, transparent 100%) !important;
+    padding: 0.9rem 0.9rem 0.95rem !important;
+  }
+  #landing .hero-caption .hero-description {
+    font-size: clamp(0.78rem, 3.35vw, 0.92rem) !important;
+    line-height: 1.45 !important;
+    text-wrap: balance !important;
+    margin: 0 auto !important;
+  }
+}
+@media (max-width: 480px) {
+  #landing .hero-slideshow__stage {
+    aspect-ratio: 3 / 4 !important;
+    min-height: 320px !important;
+  }
+  #landing .hero-slideshow__dots {
+    bottom: 3.85rem !important;
+  }
+  #landing .hero-caption {
+    padding: 0.75rem 0.75rem 0.85rem !important;
+  }
+  #landing .hero-caption .hero-description {
+    font-size: 0.78rem !important;
+    line-height: 1.4 !important;
+    max-width: 95% !important;
+  }
+}
 #landing .section-title { font-size: 2.75rem !important; font-weight: 800 !important; line-height: 1.1 !important; margin-bottom: 1.5rem !important; color: #0f172a !important; letter-spacing: -0.025em !important; }
 #landing .section-subtitle { font-size: 1.375rem !important; font-weight: 500 !important; color: #475569 !important; margin-bottom: 3rem !important; line-height: 1.5 !important; letter-spacing: -0.01em !important; }
 
@@ -56,60 +579,6 @@
   #landing .analytics-grid { grid-template-columns: 1fr !important; }
 }
 
-/* Chart Card Styles */
-#landing .analytics-chart-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important; 
-  padding: 2.5rem !important; 
-  border-radius: 20px !important;
-  box-shadow: 0 20px 60px rgba(30, 64, 175, 0.12), 0 8px 32px rgba(0,0,0,0.08) !important; 
-  border: 2px solid rgba(30, 64, 175, 0.1) !important;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important; 
-  height: 100% !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-#landing .analytics-chart-card::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: linear-gradient(90deg, #3b82f6 0%, #1e40af 50%, #3b82f6 100%) !important;
-}
-
-#landing .analytics-chart-card:hover {
-  transform: translateY(-12px) scale(1.02) !important; 
-  box-shadow: 0 32px 80px rgba(30, 64, 175, 0.2), 0 12px 40px rgba(0,0,0,0.15) !important;
-  border-color: rgba(30, 64, 175, 0.3) !important;
-}
-
-#landing .chart-header {
-  display: flex !important; justify-content: space-between !important; align-items: center !important;
-  margin-bottom: 1.5rem !important; flex-wrap: wrap !important; gap: 1rem !important;
-}
-
-#landing .chart-title {
-  font-size: 1.5rem !important; font-weight: 800 !important; color: #1e40af !important; margin: 0 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-}
-
-#landing .chart-controls {
-  display: flex !important; align-items: center !important; gap: 0.5rem !important;
-}
-
-#landing .chart-container {
-  position: relative !important; width: 100% !important;
-}
-
-#landing .chart-info-card {
-  background: white !important; padding: 1.5rem !important; border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05) !important;
-  border: 1px solid rgba(0,0,0,0.05) !important; height: 100% !important;
-  display: flex !important; flex-direction: column !important;
-}
-
 #landing .info-title {
   font-size: 1rem !important; font-weight: 700 !important; color: #0f172a !important;
   margin-bottom: 1rem !important;
@@ -133,38 +602,6 @@
   font-size: 1rem !important;
 }
 
-/* Force Horizontal Layout */
-#landing .analytics-section .row {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: stretch !important;
-  gap: 2rem !important;
-}
-
-#landing .analytics-section .col-6 {
-  flex: 1 !important;
-  width: 50% !important;
-  max-width: none !important;
-}
-
-@media (max-width: 768px) {
-  #landing .analytics-section .row {
-    flex-direction: column !important;
-  }
-  #landing .analytics-section .col-6 {
-    width: 100% !important;
-  }
-}
-
-@media (max-width: 768px) {
-  #landing .chart-header {
-    flex-direction: column !important; align-items: stretch !important;
-  }
-  
-  #landing .chart-controls {
-    justify-content: center !important;
-  }
-}
 #landing .process-steps { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; gap: 2rem !important; margin-top: 3rem !important; }
 
 /* About LNHS Section Styles */
@@ -283,7 +720,7 @@
 }
 
 #landing .facility-list li::before {
-  content: '•' !important; color: #1e40af !important; font-weight: bold !important;
+  content: 'â€¢' !important; color: #1e40af !important; font-weight: bold !important;
   position: absolute !important; left: 0 !important;
 }
 
@@ -350,20 +787,179 @@
   line-height: 1.5 !important;
 }
 
-/* Compact Horizontal Grid Layout */
-#landing .about-grid {
-  display: grid !important; gap: 2rem !important; max-width: 1500px !important; margin: 0 auto !important; width: 95% !important;
+/* Portal Highlights â€” poster + 3Ã—2 feature grid */
+#landing .portal-highlights-section {
+  padding-top: clamp(2rem, 4vw, 3rem) !important;
+  padding-bottom: clamp(2rem, 4vw, 3rem) !important;
 }
 
-#landing .intro-section {
-  background: white !important; padding: 2rem !important; border-radius: 12px !important;
-  border: 1px solid #e2e8f0 !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+#landing .portal-highlights-section .portal-highlights-header {
   text-align: center !important;
+  margin-bottom: clamp(1.5rem, 3vw, 2.25rem) !important;
+  max-width: 52rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
-#landing .intro-section .lead {
-  font-size: 1.125rem !important; color: #475569 !important; margin: 0 !important;
-  line-height: 1.6 !important;
+#landing .portal-highlights-section .portal-highlights-header .section-subtitle {
+  margin-bottom: 0 !important;
+}
+
+#landing .portal-highlights-body {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: clamp(1rem, 2.2vw, 2rem) !important;
+  align-items: stretch !important;
+}
+
+#landing .portal-poster {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  line-height: 0 !important;
+}
+
+#landing .portal-poster__img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(30, 64, 175, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(30, 64, 175, 0.16) !important;
+}
+
+#landing .portal-features-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.6rem !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  align-content: stretch !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* Minimal compact feature tiles (portal section only) */
+#landing .portal-features-grid .feature-item {
+  background: #ffffff !important;
+  background-image: none !important;
+  padding: 0.85rem 0.9rem !important;
+  border-radius: 9px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  text-align: left !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0.25rem !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+#landing .portal-features-grid .feature-item:hover {
+  transform: none !important;
+  background: #f8fafc !important;
+  border-color: #bfdbfe !important;
+  box-shadow: 0 1px 4px rgba(30, 64, 175, 0.06) !important;
+}
+
+#landing .portal-features-grid .feature-item i {
+  font-size: clamp(1.15rem, 1.6vw, 1.35rem) !important;
+  color: #1e40af !important;
+  margin: 0 0 0.35rem !important;
+  line-height: 1 !important;
+}
+
+#landing .portal-features-grid .feature-item h4 {
+  font-size: clamp(0.92rem, 1.25vw, 1.05rem) !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 0 0.35rem !important;
+  line-height: 1.35 !important;
+}
+
+#landing .portal-features-grid .feature-item p {
+  font-size: clamp(0.82rem, 1.05vw, 0.92rem) !important;
+  color: #64748b !important;
+  line-height: 1.45 !important;
+  margin: 0 0 0.4rem !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 4 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+#landing .portal-features-grid .feature-badges {
+  justify-content: flex-start !important;
+  margin-bottom: 0 !important;
+  margin-top: auto !important;
+  gap: 0.3rem !important;
+}
+
+#landing .portal-features-grid .feature-badges span {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  font-size: clamp(0.72rem, 0.9vw, 0.8rem) !important;
+  font-weight: 500 !important;
+  padding: 0.15rem 0.45rem !important;
+  border-radius: 4px !important;
+  border: none !important;
+  backdrop-filter: none !important;
+}
+
+#landing .portal-features-grid .feature-item a {
+  display: none !important;
+}
+
+@media (max-width: 1199.98px) {
+  #landing .portal-highlights-body {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+
+  #landing .portal-poster {
+    height: auto !important;
+    display: block !important;
+    max-width: min(1100px, 100%) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  #landing .portal-features-grid {
+    height: auto !important;
+    grid-template-rows: none !important;
+  }
+
+  #landing .portal-features-grid .feature-item {
+    height: auto !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #landing .portal-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #landing .portal-features-grid {
+    grid-template-columns: 1fr !important;
+  }
+
 }
 
 #landing .info-grid {
@@ -508,6 +1104,71 @@
   #landing .info-grid {
     grid-template-columns: 1fr !important;
   }
+
+  .site-footer {
+    padding: 2rem 0 0.75rem !important;
+  }
+
+  #landing .footer-main {
+    grid-template-columns: 1fr !important;
+    gap: 1.2rem !important;
+    margin-bottom: 1.5rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  #landing .footer-brand {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  #landing .footer-brand > * {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  #landing .footer-bottom {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    text-align: left !important;
+  }
+
+  #landing .footer-brand .brand-logo {
+    justify-content: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  #landing .footer-brand .brand-logo h3 {
+    font-size: 1.1rem !important;
+  }
+
+  #landing .footer-links h4,
+  #landing .footer-info h4 {
+    font-size: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  #landing .footer-links,
+  #landing .footer-info,
+  #landing .contact-info {
+    font-size: 0.95rem !important;
+  }
+
+  #landing a[href*="facebook.com"] {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1rem !important;
+    padding: 0 !important;
+  }
 }
 
 /* Horizontal Features Layout */
@@ -532,9 +1193,6 @@
   height: 100% !important;
   position: relative !important;
   overflow: hidden !important;
-  background-image:
-
-    linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
   background-size: 20px 20px, 20px 20px, 100% 100% !important;
 }
 
@@ -624,7 +1282,33 @@
   }
 }
 
-/* Enrollment Process Timeline */
+/* Portal Highlights grid â€” override generic .features-horizontal breakpoints */
+#landing #portal-highlights .portal-features-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1199.98px) {
+  #landing #portal-highlights .portal-features-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-rows: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #landing #portal-highlights .portal-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #landing #portal-highlights .portal-features-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Portal overview / process steps (legacy: enrollment-process-section) */
 #landing .process-timeline {
   display: flex !important;
   align-items: center !important;
@@ -941,6 +1625,8 @@
 }
 
 #landing .copyright i {
+ 
+ 
   color: #93c5fd !important;
 }
 
@@ -950,19 +1636,69 @@
 
 /* Responsive Footer */
 @media (max-width: 768px) {
+  .site-footer {
+    padding: 2rem 0 0.75rem !important;
+  }
+
   #landing .footer-main {
     grid-template-columns: 1fr !important;
-    gap: 2rem !important;
+    gap: 1.2rem !important;
+    margin-bottom: 1.5rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  #landing .footer-brand {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  #landing .footer-brand > * {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
   }
 
   #landing .footer-bottom {
-    flex-direction: column !important;
-    gap: 1rem !important;
-    text-align: center !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    text-align: left !important;
   }
 
   #landing .footer-brand .brand-logo {
+    justify-content: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  #landing .footer-brand .brand-logo h3 {
+    font-size: 1.1rem !important;
+  }
+
+  #landing .footer-links h4,
+  #landing .footer-info h4 {
+    font-size: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  #landing .footer-links,
+  #landing .footer-info,
+  #landing .contact-info {
+    font-size: 0.95rem !important;
+  }
+
+  #landing a[href*="facebook.com"] {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    display: inline-flex !important;
+    align-items: center !important;
     justify-content: center !important;
+    font-size: 1rem !important;
+    padding: 0 !important;
   }
 }
 
@@ -1164,1156 +1900,220 @@
   }
 }
 
-/* Principal Section Styles */
-#landing .principal-section {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-  min-height: 500px !important;
+/* Section backgrounds — portal and other landing sections */
+#landing .section-light {
+  background-color: #ffffff !important;
+  background-image: url("https://www.transparenttextures.com/patterns/batthern.png") !important;
+  background-size: auto !important;
+  background-repeat: repeat !important;
 }
-
-#landing .principal-content {
-  padding: 3rem 3rem 3rem 20rem !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-#landing .principal-info {
-  max-width: 500px !important;
-}
-
-
-
-#landing .principal-name {
-  font-size: 2rem !important;
-  font-weight: 700 !important;
-  color: #1e40af !important;
-  margin-bottom: 0.5rem !important;
-}
-
-#landing .principal-title {
-  font-size: 1.125rem !important;
-  color: #64748b !important;
-  margin-bottom: 1.5rem !important;
-  font-weight: 500 !important;
-}
-
-#landing .principal-message {
-  font-size: 1.125rem !important;
-  line-height: 1.7 !important;
-  color: #475569 !important;
-  margin-bottom: 2rem !important;
-  font-style: italic !important;
-}
-
-#landing .principal-banners {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1rem !important;
-}
-
-#landing .banner-item {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-  padding: 0.75rem 1rem !important;
-  background: white !important;
-  border-radius: 8px !important;
-  border-left: 4px solid #1e40af !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
-}
-
-#landing .banner-item i {
-  font-size: 1.25rem !important;
-  color: #1e40af !important;
-}
-
-#landing .banner-item span {
-  font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  color: #374151 !important;
-}
-
-#landing .principal-image {
-  width: 100% !important;
-  max-width: 400px !important;
-}
-
-#landing .principal-image img {
-  width: 100% !important;
-  height: 400px !important;
-  object-fit: cover !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
-}
-
-@media (max-width: 992px) {
-  #landing .principal-content {
-    padding: 2rem !important;
-    text-align: center !important;
-  }
-  
-  #landing .principal-section .row {
-    flex-direction: column-reverse !important;
-  }
-}
-
-/* Vision Mission Section Styles */
-#landing .vision-mission-section {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-
-
-#landing .vision-mission-container {
-  display: grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
-  gap: 3rem !important;
-  align-items: stretch !important;
-  max-width: 1400px !important;
-  margin: 0 auto !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-#landing .vision-card,
-#landing .mission-card {
-  background: white !important;
-  border-radius: 20px !important;
-  padding: 3rem 2.5rem !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.08) !important;
-  border: 1px solid rgba(30, 64, 175, 0.1) !important;
-  position: relative !important;
-  overflow: hidden !important;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-#landing .vision-card:hover,
-#landing .mission-card:hover {
-  transform: translateY(-12px) !important;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(30, 64, 175, 0.15) !important;
-  border-color: rgba(30, 64, 175, 0.3) !important;
-}
-
-#landing .vm-header {
-  display: flex !important;
-  align-items: center !important;
-  gap: 1.5rem !important;
-  margin-bottom: 2rem !important;
-  padding-bottom: 1.5rem !important;
-  border-bottom: 2px solid rgba(30, 64, 175, 0.1) !important;
-}
-
-#landing .vm-icon {
-  width: 70px !important;
-  height: 70px !important;
-  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.3) !important;
-  flex-shrink: 0 !important;
-}
-
-#landing .vm-icon i {
-  font-size: 2rem !important;
-  color: white !important;
-}
-
-#landing .vm-title {
-  font-size: 2.5rem !important;
-  font-weight: 800 !important;
-  color: #0f172a !important;
-  margin: 0 !important;
-  letter-spacing: -0.02em !important;
-  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-}
-
-#landing .vm-content {
-  flex-grow: 1 !important;
-  position: relative !important;
-  z-index: 2 !important;
-}
-
-#landing .vm-content p {
-  font-size: 1.125rem !important;
-  line-height: 1.7 !important;
-  color: #475569 !important;
-  margin-bottom: 1.5rem !important;
-  font-weight: 500 !important;
-}
-
-#landing .mission-list {
-  list-style: none !important;
-  padding: 0 !important;
-  margin: 1.5rem 0 0 0 !important;
-}
-
-#landing .mission-list li {
-  position: relative !important;
-  padding: 1rem 0 1rem 2.5rem !important;
-  font-size: 1.125rem !important;
-  line-height: 1.6 !important;
-  color: #475569 !important;
-  font-weight: 500 !important;
-  border-bottom: 1px solid rgba(30, 64, 175, 0.08) !important;
-  transition: all 0.3s ease !important;
-}
-
-#landing .mission-list li:last-child {
-  border-bottom: none !important;
-}
-
-#landing .mission-list li::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 1.5rem !important;
-  width: 12px !important;
-  height: 12px !important;
-  background: #000000 !important;
-  border-radius: 50% !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
-}
-
-#landing .mission-list li:hover {
-  padding-left: 3rem !important;
-  color: #1e40af !important;
-}
-
-#landing .vision-additional {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-  padding: 1.5rem !important;
-  border-radius: 12px !important;
-  margin-top: 1.5rem !important;
-  border-left: 4px solid #fbbf24 !important;
-  position: relative !important;
-}
-
-
-
-#landing .vision-additional p {
-  position: relative !important;
-  z-index: 1 !important;
-  margin-bottom: 1rem !important;
-  color: #374151 !important;
-  font-weight: 500 !important;
-}
-
-#landing .vision-additional p:last-child {
-  margin-bottom: 0 !important;
-}
-
-#landing .vm-pattern {
-  position: absolute !important;
-  top: 0 !important;
-  right: 0 !important;
-  width: 200px !important;
-  height: 200px !important;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="%233b82f6" stroke-width="0.5" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>') !important;
-  opacity: 0.3 !important;
-  z-index: 1 !important;
-}
-
-#landing .divider-line {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  position: relative !important;
-}
-
-#landing .divider-line::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  width: 2px !important;
-  background: linear-gradient(180deg, transparent 0%, #1e40af 20%, #fbbf24 50%, #1e40af 80%, transparent 100%) !important;
-}
-
-#landing .divider-icon {
-  width: 60px !important;
-  height: 60px !important;
-  background: white !important;
-  border: 3px solid #1e40af !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.2) !important;
-  position: relative !important;
-  z-index: 2 !important;
-}
-
-#landing .divider-icon i {
-  font-size: 1.5rem !important;
-  color: #fbbf24 !important;
-}
-
-/* Scroll Animations */
-#landing .scroll-animate-left {
-  opacity: 0 !important;
-  transform: translateX(-60px) !important;
-  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-#landing .scroll-animate-right {
-  opacity: 0 !important;
-  transform: translateX(60px) !important;
-  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-#landing .scroll-animate-left.animate,
-#landing .scroll-animate-right.animate {
-  opacity: 1 !important;
-  transform: translateX(0) !important;
-}
-
-/* Responsive Design */
-@media (max-width: 992px) {
-  #landing .vision-mission-container {
-    grid-template-columns: 1fr !important;
-    gap: 2rem !important;
-  }
-  
-  #landing .divider-line {
-    height: 60px !important;
-  }
-  
-  #landing .divider-line::before {
-    top: 0 !important;
-    bottom: 0 !important;
-    left: 50% !important;
-    right: auto !important;
-    width: 2px !important;
-    height: 100% !important;
-    background: linear-gradient(180deg, transparent 0%, #1e40af 20%, #fbbf24 50%, #1e40af 80%, transparent 100%) !important;
-  }
-}
-
-@media (max-width: 768px) {
-  #landing .vm-header {
-    flex-direction: column !important;
-    text-align: center !important;
-    gap: 1rem !important;
-  }
-  
-  #landing .vm-title {
-    font-size: 2rem !important;
-  }
-  
-  #landing .vision-card,
-  #landing .mission-card {
-    padding: 2rem 1.5rem !important;
-  }
-  
-  #landing .vm-content p,
-  #landing .mission-list li {
-    font-size: 1rem !important;
-  }
-}
-
-/* Disable hover effect for specific elements */
-#landing .no-hover {
-  transform: none !important;
-  transition: none !important;
-}
-
-#landing .no-hover:hover {
-  transform: none !important;
-  box-shadow: inherit !important;
+#landing .section-dark {
+  background-color: #dbeafe !important;
+  background-image: url("https://www.transparenttextures.com/patterns/dotnoise-light-grey.png") !important;
+  background-size: auto !important;
+  background-repeat: repeat !important;
 }
 </style>
 
 <div id="landing">
-  <!-- Hero Section -->
-  <section class="hero" style="background-image: url('<?= base_url('assets/images/backgrounds/lphs (1).jpeg') ?>'); background-size: cover; background-position: center; position: relative;">
-    <div class="hero-overlay" style="background: linear-gradient(135deg, rgba(30, 64, 175, 0.85) 0%, rgba(30, 58, 138, 0.9) 100%); position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1;"></div>
-
-    <div class="container hero-inner" style="position: relative; z-index: 2;">
-      <div class="hero-badge">
-        <span class="badge-text"><i class="bi bi-stars me-2"></i>Excellence in Education Since 2010</span>
-        <span class="badge-text"><i class="bi bi-cpu-fill me-2"></i>Modern Enrollment Management System</span>
-      </div>
-      <h1 class="hero-title">Excellence in Education Since 2010</h1>
-      <p class="hero-subtitle">Modern Enrollment Management System</p>
-      <p class="hero-description">Streamline your educational journey with our comprehensive digital enrollment platform. Designed for students, parents, and administrators to ensure a seamless and efficient enrollment experience.</p>
-      <div class="hero-banners">
-        <div class="hero-banner">
-          <i class="bi bi-shield-check"></i>
-          <div>
-            <strong>DepEd Recognized</strong>
-            <small>School ID 305706</small>
-          </div>
-        </div>
-        <div class="hero-banner">
-          <i class="bi bi-patch-check-fill"></i>
-          <div>
-            <strong>ISO 9001:2015</strong>
-            <small>Quality Management</small>
-          </div>
-        </div>
-        <div class="hero-banner">
-          <i class="bi bi-lightning-charge-fill"></i>
-          <div>
-            <strong>Fast & Secure</strong>
-            <small>24/7 Online Access</small>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Principal Section -->
-  <section class="principal-section py-5">
-    <div class="row g-0">
-      <div class="col-lg-6 principal-content">
-        <div class="principal-info scroll-animate-left">
-          <h3 class="principal-name">Janeth Bulacan Serafico</h3>
-          <p class="principal-title">School Head</p>
-          <p class="principal-message">"Welcome to Lourdes Provincial High School, where we are committed to nurturing young minds with excellence and integrity. With nearly three decades of dedicated service in public education, I believe in the transformative power of quality education that is both accessible and innovative. As a module writer, podcast creator, and voice talent for Radio-Based Instruction, I am passionate about making education accessible to all. Together, we shape not just academic achievers, but responsible citizens who will contribute meaningfully to our community and nation."</p>
-          <div class="principal-banners">
-            <div class="banner-item">
-              <i class="bi bi-award-fill"></i>
-              <span>29 Years DepEd Service</span>
-            </div>
-            <div class="banner-item">
-              <i class="bi bi-people-fill"></i>
-              <span>BADISESTEA & ASSTEBD President</span>
-            </div>
-            <div class="banner-item">
-              <i class="bi bi-mortarboard-fill"></i>
-              <span>MA Education - Administration & Supervision</span>
-            </div>
-            <div class="banner-item">
-              <i class="bi bi-broadcast"></i>
-              <span>RBI Module Writer & Voice Talent</span>
-            </div>
-            <div class="banner-item">
-              <i class="bi bi-geo-alt-fill"></i>
-              <span>Camarines Sur District Coordinator</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-lg-6">
-        <div class="container h-100 d-flex align-items-center">
-          <div class="principal-image scroll-animate-right">
-            <img src="<?= base_url('principal.jpg') ?>" alt="Janeth Bulacan Serafico" class="img-fluid rounded-3" style="border: 4px solid #1e40af; width: 100%; max-width: 500px; height: 500px; object-fit: cover;">
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-
-
-  <!-- About LNHS Section -->
-  <section id="about-section" class="py-4">
-    <div class="container">
-      <div class="text-center mb-4">
-        <h2 class="section-title">About Lourdes Provincial High School</h2>
-        <p class="section-subtitle">A public secondary school serving Lourdes Young, Nabua, Camarines Sur under DepEd Region V</p>
-      </div>
-
-      <!-- Compact Grid Layout -->
-      <div class="about-grid">
-        <div class="intro-section">
-          <p class="lead">Lourdes Provincial High School, located in Lourdes Young, Nabua, Camarines Sur, is a public high school under the Department of Education (DepEd) Region V. The school is committed to accessible, quality education and community-centered service.</p>
-        </div>
-
-
-
-        <div class="features-row">
-          <div class="feature-box">
-            <h4><i class="bi bi-award-fill"></i> Tourism Excellence Center</h4>
-            <p class="feature-subtitle">Philippines' first Senior High School Tourism Facility</p>
-            <div class="feature-details">
-              <span><strong>Training Facilities</strong> (Feb 2017): Suite, deluxe, and standard training rooms • Professional kitchen and laundry facilities • Restaurant and conference room</span>
-              <span><strong>TESDA Assessment Center</strong>: Housekeeping, Cookery, Bread & Pastry • Food & Beverage, Front Office • Carpentry, Electrical Installation & Maintenance</span>
-            </div>
-          </div>
-
-          <div class="feature-box">
-            <h4><i class="bi bi-handshake"></i> Industry Partnerships</h4>
-            <p class="feature-subtitle">Strengthening curriculum through real-world collaboration</p>
-            <div class="partnership-list">
-              <span><i class="bi bi-building-fill"></i> Resort Partners: Bellevue, Amorita, South Palms, Henann</span>
-              <span><i class="bi bi-globe"></i> BAHRR: Bohol Association of Hotels, Resorts & Restaurants</span>
-              <span><i class="bi bi-gear-fill"></i> DOST: Department of Science and Technology</span>
-              <span><i class="bi bi-mortarboard-fill"></i> International: Global education partners</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="compliance-row">
-          <div class="compliance-badge">
-            <i class="bi bi-check-circle-fill"></i>
-            <div><strong>100% DepEd Compliance</strong> • All 37 school-level applications fully processed in DepEd RMS</div>
-          </div>
-          <div class="campus-badge">
-            <i class="bi bi-tree-fill"></i>
-            <span>Known for our iconic acacia trees</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Vision Mission Section -->
-  <section id="vision-mission-section" class="vision-mission-section py-5">
-    <div class="text-center mb-5">
-      <h2 class="section-title">Our Vision & Mission</h2>
-      <p class="section-subtitle">Guiding principles that shape our commitment to educational excellence</p>
-    </div>
-    
-    <div class="row" style="padding-left: 10rem; padding-right: 10rem;">
-      <div class="col-lg-6 mb-4">
-        <h3 class="vm-title mb-4">VISION</h3>
-        <p>We dream of Filipinos who passionately love their country and whose values and competencies enable them to realize their full potential and contribute meaningfully to building the nation.</p>
-        <p>As a learner-centered public institution, the Department of Education continuously improves itself to better serve its stakeholders.</p>
-        <p><strong>At Lourdes Provincial High School, we envision graduates who are:</strong></p>
-        <p>Globally competitive yet rooted in Filipino values, equipped with 21st-century skills and digital literacy to thrive in an ever-changing world.</p>
-        <p>Empowered to become lifelong learners, critical thinkers, and responsible citizens who contribute to sustainable development and social progress.</p>
-      </div>
-      
-      <div class="col-lg-6 mb-4">
-        <h3 class="vm-title mb-4">MISSION</h3>
-        <p>To protect and promote the right of every Filipino to quality, equitable, culture-based and complete basic education where:</p>
-        <ul class="mission-list">
-          <li>Students learn in a child-friendly, gender-sensitive, safe and motivating environment.</li>
-          <li>Teachers facilitate learning and constantly nurture every learner.</li>
-          <li>Administrators and staff, as stewards of the institution, ensure an enabling and supportive environment for effective learning to happen.</li>
-          <li>Family, community and other stakeholders are actively engaged and share responsibility for developing life-long learners.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Features Section -->
-  <section class="py-4">
-    <div class="container">
-      <div class="text-center mb-4">
-        <h2 class="section-title">Enrollment System Features</h2>
-        <p class="section-subtitle">Our comprehensive digital platform provides all the tools needed for efficient student enrollment and academic management.</p>
-      </div>
-      <div class="features-horizontal">
-        <div class="feature-item">
-          <i class="bi bi-file-earmark-plus-fill"></i>
-          <h4>Online Enrollment</h4>
-          <p>Complete enrollment process from home with our secure digital platform. Submit documents, pay fees, and receive confirmation instantly.</p>
-          <div class="feature-badges">
-            <span>24/7 Access</span><span>Mobile Friendly</span><span>Secure</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-        <div class="feature-item">
-          <i class="bi bi-database-fill-lock"></i>
-          <h4>Student Records Management</h4>
-          <p>Comprehensive digital repository for all student information with advanced security protocols and instant access for authorized personnel.</p>
-          <div class="feature-badges">
-            <span>Cloud Storage</span><span>Encrypted</span><span>Backup</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-        <div class="feature-item">
-          <i class="bi bi-graph-up-arrow"></i>
-          <h4>Grade Monitoring System</h4>
-          <p>Real-time grade tracking with analytics, progress reports, and performance insights for students, parents, and teachers.</p>
-          <div class="feature-badges">
-            <span>Real-time</span><span>Analytics</span><span>Reports</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-        <div class="feature-item">
-          <i class="bi bi-qr-code-scan"></i>
-          <h4>Automated ID Generation</h4>
-          <p>Automatic generation of unique student identification numbers with QR codes for easy verification and campus access.</p>
-          <div class="feature-badges">
-            <span>QR Codes</span><span>Unique IDs</span><span>Verification</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-        <div class="feature-item">
-          <i class="bi bi-robot"></i>
-          <h4>AI Support Chatbot</h4>
-          <p>Intelligent virtual assistant providing instant support for enrollment questions, academic information, and general school inquiries.</p>
-          <div class="feature-badges">
-            <span>24/7 Support</span><span>Instant Response</span><span>Multilingual</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-        <div class="feature-item">
-          <i class="bi bi-bell-fill"></i>
-          <h4>Smart Notifications</h4>
-          <p>Automated notification system for important updates, deadlines, and announcements via email, SMS, and in-app messaging.</p>
-          <div class="feature-badges">
-            <span>Multi-Channel</span><span>Automated</span><span>Timely</span>
-          </div>
-          <a href="#">Learn More</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Analytics Section -->
-  <section id="analytics-section" class="analytics-section py-5">
-    <div class="container">
-      <div class="text-center mb-5">
-        <h2 class="section-title">School Analytics & Data Insights</h2>
-        <p class="section-subtitle">Real-time enrollment data, trends, and predictive analytics to support informed decision-making for academic excellence.</p>
-      </div>
-      
-      <!-- Charts with Text Containers Side by Side -->
-      <div class="row g-4 mb-4">
-        <!-- Enrolled Students Chart -->
-        <div class="col-6">
-          <div class="analytics-chart-card">
-            <div class="chart-header">
-              <h5 class="chart-title">Enrolled Students</h5>
-              <small class="text-muted">Monthly enrollment data</small>
-            </div>
-            <div class="chart-container" style="height: 400px;">
-              <canvas id="enrollmentChart"></canvas>
-            </div>
-          </div>
-        </div>
-        <!-- Enrolled Students Info -->
-        <div class="col-6">
-          <div class="analytics-chart-card h-100">
-            <div class="d-flex align-items-center mb-3">
-              <i class="bi bi-database-fill text-primary me-2" style="font-size: 1.5rem;"></i>
-              <h6 class="fw-bold text-primary mb-0">Real-Time Enrollment Data</h6>
-            </div>
-            <p class="small mb-3">This interactive chart displays actual student enrollment numbers throughout the academic year, sourced directly from our secure database with automatic synchronization every 15 minutes.</p>
-            <div class="mb-3">
-              <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-server text-info me-2"></i>
-                <h6 class="small fw-semibold text-dark mb-0">Data Sources:</h6>
-              </div>
-              <ul class="small text-muted mb-0" style="padding-left: 1.5rem;">
-                <li>Live database records with real-time validation</li>
-                <li>Philippine school calendar patterns and holidays</li>
-                <li>5+ years of historical enrollment trends</li>
-                <li>Encrypted data transmission and storage</li>
-              </ul>
-            </div>
-            <div class="mb-3">
-              <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-lightbulb text-warning me-2"></i>
-                <h6 class="small fw-semibold text-dark mb-0">Key Insights:</h6>
-              </div>
-              <ul class="small text-muted mb-0" style="padding-left: 1.5rem;">
-                <li>Peak enrollment: June-July (School Year start)</li>
-                <li>Late enrollments: August-September period</li>
-                <li>Minimal activity: November-December holidays</li>
-                <li>Average monthly capacity: 40 students per section</li>
-              </ul>
-            </div>
-            <div class="d-flex align-items-center gap-2 mt-auto">
-              <i class="bi bi-shield-check text-primary"></i>
-              <small class="text-primary fw-semibold">Secure & Reliable Data Source</small>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="row g-4 mb-4">
-        <!-- Enrollment Predictions Chart -->
-        <div class="col-6">
-          <div class="analytics-chart-card">
-            <div class="chart-header">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <h5 class="chart-title">Enrollment Predictions</h5>
-                </div>
-                <div class="chart-controls d-flex align-items-center gap-1">
-                  <button class="btn btn-sm btn-outline-secondary px-2 py-1" onclick="changePredictionPeriod(-1)"><i class="bi bi-chevron-left"></i></button>
-                  <span id="predictionPeriod" class="mx-1 fw-semibold text-success">2026</span>
-                  <button class="btn btn-sm btn-outline-secondary px-2 py-1" onclick="changePredictionPeriod(1)"><i class="bi bi-chevron-right"></i></button>
-                  <select id="predictionView" class="form-select form-select-sm ms-1" style="width: auto;" onchange="updatePredictionChart()">
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="chart-container" style="height: 400px;">
-              <canvas id="predictionChart"></canvas>
-            </div>
-          </div>
-        </div>
-        <!-- Predictions Info -->
-        <div class="col-6">
-          <div class="analytics-chart-card h-100">
-            <div class="d-flex align-items-center mb-3">
-              <i class="bi bi-cpu text-success me-2" style="font-size: 1.5rem;"></i>
-              <h6 class="fw-bold text-success mb-0">AI Prediction Algorithm</h6>
-            </div>
-            <p class="small mb-3">Our advanced machine learning system uses statistical analysis and neural networks to forecast future enrollment patterns, combining historical data with demographic trends and policy impacts.</p>
-            <div class="mb-3">
-              <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-gear text-info me-2"></i>
-                <h6 class="small fw-semibold text-dark mb-0">Algorithm Components:</h6>
-              </div>
-              <ul class="small text-muted mb-0" style="padding-left: 1.5rem;">
-                <li><strong>Base Data:</strong> 2024 enrollment records as foundation</li>
-                <li><strong>Growth Rate:</strong> 5-15% annual projection range</li>
-                <li><strong>Seasonal Pattern:</strong> Philippine academic calendar integration</li>
-                <li><strong>ML Model:</strong> Regression analysis with confidence intervals</li>
-              </ul>
-            </div>
-            <div class="mb-3">
-              <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-list-check text-warning me-2"></i>
-                <h6 class="small fw-semibold text-dark mb-0">Factors Analyzed:</h6>
-              </div>
-              <ul class="small text-muted mb-0" style="padding-left: 1.5rem;">
-                <li>Regional population growth and migration patterns</li>
-                <li>DepEd policy changes and curriculum updates</li>
-                <li>Seasonal enrollment cycles and peak periods</li>
-                <li>Multi-year historical growth trajectories</li>
-                <li>Infrastructure capacity and expansion plans</li>
-              </ul>
-            </div>
-            <div class="d-flex align-items-center gap-2 mt-auto">
-              <i class="bi bi-award text-success"></i>
-              <small class="text-success fw-semibold">85% prediction accuracy rate</small>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-
-
-  <!-- Testimonials Section -->
-  <section class="testimonials-section py-5">
-    <div class="container">
-      <div class="text-center mb-4">
-        <h2 class="section-title">What Our Community Says</h2>
-        <p class="section-subtitle">Voices from students, parents, and teachers</p>
-      </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card">
-          <div class="profile">
-            <img src="https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200" alt="Student" />
-            <div>
-              <strong>Mark Reyes</strong>
-              <small>Grade 12 · STEM</small>
-            </div>
-          </div>
-          <p class="quote">“The online enrollment was smooth and fast. I tracked my documents and schedule right from my phone.”</p>
-        </div>
-        <div class="testimonial-card">
-          <div class="profile">
-            <img src="https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=200" alt="Parent" />
-            <div>
-              <strong>Angela Cruz</strong>
-              <small>Parent</small>
-            </div>
-          </div>
-          <p class="quote">“Grades and announcements are all in one place. The system keeps us informed with timely notifications.”</p>
-        </div>
-        <div class="testimonial-card">
-          <div class="profile">
-            <img src="https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=200" alt="Teacher" />
-            <div>
-              <strong>Sir Daniel Santos</strong>
-              <small>Teacher · ICT</small>
-            </div>
-          </div>
-          <p class="quote">“Student records and analytics help us personalize learning and improve class performance.”</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Accreditations & Partners -->
-  <section class="accreditations-section py-4">
-    <div class="container">
-      <div class="text-center mb-3">
-        <h2 class="section-title">Accreditations & Partnerships</h2>
-        <p class="section-subtitle">Recognized by education and industry partners</p>
-      </div>
-      <div class="accreditations-row">
-        <div class="accreditation-badge"><i class="bi bi-shield-check"></i> DepEd Recognized</div>
-        <div class="accreditation-badge"><i class="bi bi-patch-check-fill"></i> TESDA Assessment Center</div>
-        <div class="accreditation-badge"><i class="bi bi-diagram-3"></i> Industry Partners: BAHRR</div>
-        <div class="accreditation-badge"><i class="bi bi-globe"></i> International Collaborations</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-
-
-
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Enrollment Process Section -->
-  <section id="enrollment-process" class="enrollment-process-section py-5">
-    <div class="container">
-      <div class="text-center mb-5">
-        <h2 class="section-title">Enrollment Process</h2>
-        <p class="section-subtitle">Follow these simple steps to complete your enrollment at LPHS</p>
-      </div>
-
-      <div class="enrollment-process-steps">
-        <div class="process-item scroll-animate">
-          <div class="process-icon-wrapper">
-            <div class="process-number">1</div>
-            <div class="process-icon">
-              <i class="bi bi-person-plus-fill"></i>
-            </div>
-          </div>
-          <div class="process-content">
-            <h4 class="process-title">Create Account</h4>
-            <p class="process-description">Register your account with basic information. Provide your email, create a secure password, and verify your identity.</p>
-            <div class="process-features">
-              <span class="feature-badge"><i class="bi bi-shield-check"></i> Secure Registration</span>
-              <span class="feature-badge"><i class="bi bi-envelope-check"></i> Email Verification</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="process-item scroll-animate">
-          <div class="process-icon-wrapper">
-            <div class="process-number">2</div>
-            <div class="process-icon">
-              <i class="bi bi-file-earmark-text-fill"></i>
-            </div>
-          </div>
-          <div class="process-content">
-            <h4 class="process-title">Fill Application</h4>
-            <p class="process-description">Complete the enrollment form with your personal details, academic background, and program preferences.</p>
-            <div class="process-features">
-              <span class="feature-badge"><i class="bi bi-save"></i> Auto-Save Progress</span>
-              <span class="feature-badge"><i class="bi bi-clock"></i> 24/7 Access</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="process-item scroll-animate">
-          <div class="process-icon-wrapper">
-            <div class="process-number">3</div>
-            <div class="process-icon">
-              <i class="bi bi-cloud-upload-fill"></i>
-            </div>
-          </div>
-          <div class="process-content">
-            <h4 class="process-title">Upload Documents</h4>
-            <p class="process-description">Submit required documents including transcripts, certificates, and identification. All uploads are secure and encrypted.</p>
-            <div class="process-features">
-              <span class="feature-badge"><i class="bi bi-file-check"></i> Document Validation</span>
-              <span class="feature-badge"><i class="bi bi-cloud-check"></i> Cloud Storage</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="process-item scroll-animate">
-          <div class="process-icon-wrapper">
-            <div class="process-number">4</div>
-            <div class="process-icon">
-              <i class="bi bi-check-circle-fill"></i>
-            </div>
-          </div>
-          <div class="process-content">
-            <h4 class="process-title">Confirmation</h4>
-            <p class="process-description">Receive instant confirmation and track your application status. Get notified about next steps and important updates.</p>
-            <div class="process-features">
-              <span class="feature-badge"><i class="bi bi-bell"></i> Real-time Updates</span>
-              <span class="feature-badge"><i class="bi bi-graph-up"></i> Status Tracking</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-    </div>
-  </section>
-
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- CTA Section -->
-  <section class="cta-section py-5">
-    <div class="container">
-      <div class="cta-content">
-        <div class="mb-3">
-          <span class="badge-text">Join LPHS Today</span>
-        </div>
-        <h2 class="cta-title">Ready to Start Your Journey?</h2>
-        <p class="cta-subtitle">Join the LPHS community and experience excellence in education</p>
-        <div class="cta-actions">
-          <a href="<?= base_url('register') ?>" class="btn btn-accent btn-lg">
-            <i class="bi bi-arrow-right-circle me-2"></i>
-            Start Enrollment Now
-          </a>
-
-        </div>
-      </div>
-      <div class="cta-background-pattern"></div>
-    </div>
-  </section>
-
+  <?= $this->include('partials/landing_hero') ?>
 </div>
 
-<!-- Chart.js Library -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Charts Script -->
 <script>
-let enrollmentChart;
-let predictionChart;
-let currentPredictionYear = 2026;
+(function () {
+  var loader = document.getElementById('landingPageLoader');
+  if (!loader) return;
 
-// Monthly enrollment data from controller
-const monthlyEnrollmentData = <?= $monthlyEnrollmentData ?? '[5, 4, 1, 4, 7, 63, 51, 27, 11, 14, 3, 1]' ?>;
+  document.documentElement.classList.add('landing-loader-active');
 
-// Get current enrollment data for predictions
-const currentTotal = monthlyEnrollmentData.reduce((a, b) => a + b, 0);
+  var start = Date.now();
+  var minMs = 1100;
 
-// AI-generated predictions with fallback
-const predictionData = <?= $predictionData ?? 'null' ?> || {
-  2026: { 
-    monthly: monthlyEnrollmentData.map(val => Math.round(val * 1.08)), 
-    yearly: [Math.round(currentTotal * 1.08)] 
-  },
-  2027: { 
-    monthly: monthlyEnrollmentData.map(val => Math.round(val * 1.1664)), 
-    yearly: [Math.round(currentTotal * 1.1664)] 
-  },
-  2028: { 
-    monthly: monthlyEnrollmentData.map(val => Math.round(val * 1.2597)), 
-    yearly: [Math.round(currentTotal * 1.2597)] 
-  }
-};
-
-function initializeCharts() {
-  const colorPrimary = '#10b981';
-  const colorSuccess = '#10b981';
-  const colorHeading = '#0f172a';
-
-  // Initialize Enrollment Chart (same as admin dashboard)
-  const enrollmentCtx = document.getElementById('enrollmentChart')?.getContext('2d');
-  if (enrollmentCtx) {
-    enrollmentChart = new Chart(enrollmentCtx, {
-      type: 'bar',
-      data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        datasets: [{
-          label: 'Enrolled Students',
-          data: monthlyEnrollmentData,
-          backgroundColor: colorPrimary + '80',
-          borderColor: colorPrimary,
-          borderWidth: 2,
-          borderRadius: 6,
-          maxBarThickness: 40,
-          categoryPercentage: 0.8,
-          barPercentage: 0.6,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1, color: colorHeading },
-            grid: { color: 'rgba(15,23,42,0.06)' }
-          },
-          x: {
-            ticks: { color: colorHeading },
-            grid: { display: false }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.raw} students enrolled`
-            }
-          }
+  function dismiss() {
+    var wait = Math.max(0, minMs - (Date.now() - start));
+    window.setTimeout(function () {
+      loader.classList.add('is-done');
+      loader.setAttribute('aria-busy', 'false');
+      document.documentElement.classList.remove('landing-loader-active');
+      window.setTimeout(function () {
+        if (loader.parentNode) {
+          loader.parentNode.removeChild(loader);
         }
-      }
-    });
+      }, 600);
+    }, wait);
   }
 
-  // Initialize Prediction Chart (same as admin dashboard)
-  const predictionCtx = document.getElementById('predictionChart')?.getContext('2d');
-  if (predictionCtx) {
-    predictionChart = new Chart(predictionCtx, {
-      type: 'line',
-      data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        datasets: [{
-          label: 'Predicted Enrollments',
-          data: predictionData[currentPredictionYear].monthly,
-          borderColor: colorSuccess,
-          backgroundColor: colorSuccess + '20',
-          borderWidth: 3,
-          fill: true,
-          tension: 0.4,
-          borderDash: [5, 5]
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { beginAtZero: true, ticks: { color: colorHeading } },
-          x: { ticks: { color: colorHeading } }
-        },
-        plugins: {
-          legend: { display: false }
-        }
-      }
-    });
-  }
-}
-
-function changePredictionPeriod(direction) {
-  currentPredictionYear += direction;
-  if (currentPredictionYear < 2025) currentPredictionYear = 2025;
-  if (currentPredictionYear > 2027) currentPredictionYear = 2027;
-  document.getElementById('predictionPeriod').textContent = currentPredictionYear;
-  updatePredictionChart();
-}
-
-function updatePredictionChart() {
-  if (!predictionChart) return;
-  const view = document.getElementById('predictionView').value;
-  const data = predictionData[currentPredictionYear];
-  
-  if (view === 'monthly') {
-    predictionChart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    predictionChart.data.datasets[0].data = data.monthly;
+  if (document.readyState === 'complete') {
+    dismiss();
   } else {
-    predictionChart.data.labels = [currentPredictionYear.toString()];
-    predictionChart.data.datasets[0].data = data.yearly;
+    window.addEventListener('load', dismiss, { once: true });
   }
-  predictionChart.update();
-}
+})();
+</script>
+<script>
+(function () {
+  var hero = document.querySelector('#landing .hero-slideshow');
+  if (!hero) return;
 
+  var slides = hero.querySelectorAll('.hero-slide');
+  var dots = hero.querySelectorAll('.hero-slideshow__dot');
+  if (!slides.length) return;
 
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (slides.length === 1 || reducedMotion) return;
 
-// Animation Script
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize charts first
-  initializeCharts();
-  // Add scroll animation classes
-  const animateElements = document.querySelectorAll('#landing .stats-card, #landing .feature-item, #landing .analytics-item, #landing .process-item, #landing .testimonial-card, #landing .accreditation-badge, #landing .enrollment-cta-box');
-  
-  // Vision Mission scroll animations
-  const visionMissionElements = document.querySelectorAll('#landing .scroll-animate-left, #landing .scroll-animate-right');
-  
-  animateElements.forEach((el, index) => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(30px)';
-    el.style.transition = 'all 0.6s ease-out';
-    
-    if (index % 3 === 0) {
-      el.style.transform = 'translateX(-30px)';
-    } else if (index % 3 === 2) {
-      el.style.transform = 'translateX(30px)';
+  var current = 0;
+  var timer = null;
+  var intervalMs = 6000;
+
+  function goTo(index) {
+    current = (index + slides.length) % slides.length;
+    slides.forEach(function (slide, i) {
+      slide.classList.toggle('is-active', i === current);
+    });
+    dots.forEach(function (dot, i) {
+      dot.classList.toggle('is-active', i === current);
+      dot.setAttribute('aria-selected', i === current ? 'true' : 'false');
+    });
+  }
+
+  function next() {
+    goTo(current + 1);
+  }
+
+  function start() {
+    stop();
+    timer = window.setInterval(next, intervalMs);
+  }
+
+  function stop() {
+    if (timer) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  dots.forEach(function (dot) {
+    dot.addEventListener('click', function () {
+      var idx = parseInt(dot.getAttribute('data-goto'), 10);
+      if (!isNaN(idx)) {
+        goTo(idx);
+        start();
+      }
+    });
+  });
+
+  // Prev/Next arrow handlers
+  var prevBtn = hero.querySelector('.hero-prev');
+  var nextBtn = hero.querySelector('.hero-next');
+  if (prevBtn) prevBtn.addEventListener('click', function () { goTo(current - 1); start(); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { goTo(current + 1); start(); });
+
+  // Keyboard navigation (left/right)
+  hero.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowLeft') { ev.preventDefault(); goTo(current - 1); start(); }
+    if (ev.key === 'ArrowRight') { ev.preventDefault(); goTo(current + 1); start(); }
+  });
+
+  hero.addEventListener('mouseenter', stop);
+  hero.addEventListener('mouseleave', start);
+  hero.addEventListener('focusin', stop);
+  hero.addEventListener('focusout', start);
+
+  start();
+})();
+</script>
+<script>
+(function () {
+  var track = document.querySelector('#landing .landing-announcement-strip__track');
+  if (!track) return;
+
+  function updateStripDuration() {
+    var distance = track.offsetWidth / 2;
+    var speed = 70; // pixels per second
+    var duration = Math.max(16, Math.min(60, Math.round(distance / speed)));
+    track.style.setProperty('--landing-strip-duration', duration + 's');
+  }
+
+  updateStripDuration();
+  window.addEventListener('resize', updateStripDuration);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>
+(function () {
+  if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  var root = document.querySelector('#landing');
+  if (!root) return;
+
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion) return;
+
+  var heroEase = 'power3.out';
+  var scrollEase = 'power2.out';
+
+  // Hero entrance (formal + subtle)
+  var heroDesc = root.querySelector('.hero-description');
+  if (heroDesc) {
+    gsap.timeline({ defaults: { ease: heroEase } }).from(heroDesc, { opacity: 0, y: 20, duration: 0.55 });
+  }
+
+  // Utility: animate in without hiding content permanently.
+  // We do NOT set opacity:0 upfront in CSS; ScrollTrigger.batch will only animate when entering view.
+  function batchReveal(targets, opts) {
+    ScrollTrigger.batch(targets, {
+      start: 'top 90%',
+      once: true,
+      onEnter: function (batch) {
+        gsap.fromTo(
+          batch,
+          { autoAlpha: 1, y: (opts && opts.fromY) || 18, x: (opts && opts.fromX) || 0 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            x: 0,
+            duration: (opts && opts.duration) || 0.6,
+            ease: scrollEase,
+            stagger: (opts && opts.stagger) || 0.06,
+            overwrite: 'auto',
+            immediateRender: false
+          }
+        );
+      }
+    });
+  }
+
+  // Titles + section subtitles
+  batchReveal('#landing .section-title', { fromY: 20, duration: 0.55, stagger: 0.08 });
+  batchReveal('#landing .section-subtitle', { fromY: 14, duration: 0.5, stagger: 0.08 });
+
+  // Features, process, accreditations
+  batchReveal('#landing .feature-item', { fromY: 18, duration: 0.6, stagger: 0.06 });
+  batchReveal('#landing .process-item', { fromY: 18, duration: 0.6, stagger: 0.08 });
+  batchReveal('#landing .accreditation-badge', { fromY: 14, duration: 0.55, stagger: 0.06 });
+
+  // CTA
+  ScrollTrigger.create({
+    trigger: '#landing .cta-section',
+    start: 'top 90%',
+    once: true,
+    onEnter: function () {
+      var cta = root.querySelector('#landing .cta-content');
+      if (!cta) return;
+      gsap.fromTo(cta, { autoAlpha: 1, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: scrollEase, immediateRender: false });
     }
   });
 
-  // Section titles animate from bottom
-  const sectionTitles = document.querySelectorAll('#landing .section-title');
-  sectionTitles.forEach(title => {
-    title.style.opacity = '0';
-    title.style.transform = 'translateY(30px)';
-    title.style.transition = 'all 0.6s ease-out';
+  // Ensure triggers account for images/layout
+  window.addEventListener('load', function () {
+    ScrollTrigger.refresh();
   });
-
-  // Intersection Observer for animations
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.style.opacity = '1';
-        entry.target.style.transform = 'translateY(0) translateX(0)';
-      } else {
-        entry.target.style.opacity = '0';
-        const index = [...animateElements, ...sectionTitles].indexOf(entry.target);
-        if (index % 3 === 0) {
-          entry.target.style.transform = 'translateX(-30px)';
-        } else if (index % 3 === 2) {
-          entry.target.style.transform = 'translateX(30px)';
-        } else {
-          entry.target.style.transform = 'translateY(30px)';
-        }
-      }
-    });
-  }, {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
-  });
-
-  // Vision Mission Observer
-  const vmObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('animate');
-      } else {
-        entry.target.classList.remove('animate');
-      }
-    });
-  }, {
-    threshold: 0.2,
-    rootMargin: '0px 0px -100px 0px'
-  });
-
-  // Observe vision mission elements
-  visionMissionElements.forEach(el => {
-    vmObserver.observe(el);
-  });
-
-  // Observe all animation elements
-  [...animateElements, ...sectionTitles].forEach(el => {
-    observer.observe(el);
-  });
-});
+})();
 </script>
 
 <?= $this->endSection() ?>
+
 

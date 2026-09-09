@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -15,13 +14,14 @@ class StudentModel extends Model
     protected $allowedFields = [
         'student_id', 'user_id', 'lrn', 'student_type', 'first_name', 'middle_name', 'last_name', 'suffix',
         'gender', 'date_of_birth', 'place_of_birth', 'nationality', 'religion',
+        'height_cm', 'weight_kg', 'ethnicity', 'bmi', 'nutrition_status',
         'contact_number', 'phone', 'email', 'address', 'emergency_contact_name',
         'emergency_contact_number', 'emergency_contact_relationship', 'photo_path',
-        'enrollment_status', 'grade_level', 'section_id', 'school_year', 'temp_password'
+        'enrollment_status', 'grade_level', 'section_id', 'school_year', 'temp_password', 'can_view_report_card'
     ];
 
     protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
+    protected bool $updateOnlyChanged = false;
 
     protected array $casts = [];
     protected array $castHandlers = [];
@@ -39,9 +39,10 @@ class StudentModel extends Model
         'last_name' => 'required|max_length[100]',
         'gender' => 'required|in_list[Male,Female]',
         'date_of_birth' => 'required|valid_date',
-        'enrollment_status' => 'in_list[pending,approved,rejected,enrolled,graduated,dropped]',
-        'grade_level' => 'permit_empty|integer|greater_than[6]|less_than[13]',
-        'email' => 'permit_empty|valid_email'
+        'enrollment_status' => 'permit_empty|in_list[pending,approved,rejected,enrolled,graduated,dropped,transferred]',
+        'grade_level' => 'permit_empty|in_list[0,1,2,3,4,5,6]',
+        'email' => 'permit_empty|valid_email',
+        'lrn' => 'permit_empty|max_length[20]|is_unique[students.lrn,id,{id}]'
     ];
     protected $validationMessages = [];
     protected $skipValidation = false;
@@ -49,7 +50,7 @@ class StudentModel extends Model
 
     // Callbacks
     protected $allowCallbacks = true;
-    protected $beforeInsert = ['generateStudentId'];
+    protected $beforeInsert = ['generateStudentId', 'setDefaultReportCardAccess'];
     protected $afterInsert = [];
     protected $beforeUpdate = [];
     protected $afterUpdate = [];
@@ -67,6 +68,17 @@ class StudentModel extends Model
             if (empty($data['data']['student_id'])) {
                 $data['data']['student_id'] = $this->createUniqueStudentId();
             }
+        }
+        return $data;
+    }
+
+    /**
+     * Set default report card access to disabled for new students
+     */
+    protected function setDefaultReportCardAccess(array $data)
+    {
+        if (!isset($data['data']['can_view_report_card'])) {
+            $data['data']['can_view_report_card'] = 0;
         }
         return $data;
     }
@@ -125,6 +137,24 @@ class StudentModel extends Model
     public function getBySection($sectionId)
     {
         return $this->where('section_id', $sectionId)->findAll();
+    }
+
+    /**
+     * Height, weight, and ethnicity required for principal nutrition report.
+     */
+    public static function isNutritionProfileComplete(?array $student): bool
+    {
+        if ($student === null) {
+            return false;
+        }
+
+        $h = $student['height_cm'] ?? null;
+        $w = $student['weight_kg'] ?? null;
+        $e = $student['ethnicity'] ?? null;
+
+        return $h !== null && $h !== '' && (float) $h > 0
+            && $w !== null && $w !== '' && (float) $w > 0
+            && $e !== null && trim((string) $e) !== '';
     }
 
     /**

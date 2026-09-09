@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -19,10 +19,26 @@
 <div class="card">
   <div class="card-body p-0">
     <?php if (!empty($archivedStudents)): ?>
+      <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+        <div>
+          <input type="checkbox" id="selectAll" class="form-check-input me-2">
+          <label for="selectAll" class="form-check-label">Select All</label>
+          <span id="selectedCount" class="ms-2 text-muted">(0 selected)</span>
+        </div>
+        <div>
+          <button id="bulkRestoreBtn" type="button" class="btn btn-success btn-sm me-2" style="display: none;">
+            <i class="bi bi-arrow-clockwise"></i> Restore Selected
+          </button>
+          <button id="bulkDeleteBtn" type="button" class="btn btn-danger btn-sm" style="display: none;">
+            <i class="bi bi-trash"></i> Delete Selected
+          </button>
+        </div>
+      </div>
       <div class="table-responsive">
         <table class="table table-striped table-hover mb-0">
           <thead>
             <tr>
+              <th style="width: 40px;"></th>
               <th>LRN</th>
               <th>Name</th>
               <th>Grade</th>
@@ -33,16 +49,21 @@
           <tbody>
             <?php foreach ($archivedStudents as $st): ?>
               <tr>
+                <td><input type="checkbox" class="form-check-input student-checkbox" data-student-id="<?= $st['id'] ?>" data-student-name="<?= esc($st['first_name'].' '.$st['last_name']) ?>"></td>
                 <td><?= esc($st['lrn'] ?? '—') ?></td>
                 <td><?= esc($st['first_name'].' '.$st['last_name']) ?></td>
-                <td>Grade <?= esc($st['grade_level']) ?></td>
+                <td><?= esc(grade_level_label((int) ($st['grade_level'] ?? 0))) ?></td>
                 <td><?= date('M j, Y g:i A', strtotime($st['deleted_at'])) ?></td>
                 <td class="text-end">
                   <div class="btn-group" role="group">
-                    <button class="btn btn-sm btn-outline-success" onclick="restoreStudent(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name']) ?>')" title="Restore Student">
+                    <!-- confirmation-gate-2026-06-28 -->
+                    <a href="<?= base_url('admin/students/view-archived/' . $st['id']) ?>" class="btn btn-sm btn-info" title="View Details">
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                    <button type="button" class="btn btn-sm btn-success" title="Restore Student" id="restoreBtn-<?= $st['id'] ?>" onclick="return confirm('Are you sure you want to restore <?= esc($st['first_name'] . ' ' . $st['last_name'], 'js') ?>?') && restoreStudent(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name'], 'js') ?>')">
                       <i class="bi bi-arrow-clockwise"></i> Restore
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteStudentPermanently(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name']) ?>')" title="Delete Permanently">
+                    <button type="button" class="btn btn-sm btn-danger" title="Delete Permanently" id="deleteBtn-<?= $st['id'] ?>" onclick="return confirm('PERMANENT DELETE: <?= esc($st['first_name'] . ' ' . $st['last_name'], 'js') ?> cannot be undone. Continue?') && confirm('Final warning: all records will be permanently deleted.') && deleteStudentPermanently(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name'], 'js') ?>')">
                       <i class="bi bi-trash"></i> Delete
                     </button>
                   </div>
@@ -63,58 +84,124 @@
 </div>
 
 <script>
-// Restore student function
-function restoreStudent(studentId, studentName) {
-  if (confirm(`Are you sure you want to restore student "${studentName}"? They will be moved back to active students.`)) {
-    fetch(`<?= base_url('admin/students/restore') ?>/${studentId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        alert(data.message);
-        location.reload();
-      } else {
-        alert('Error: ' + data.error);
-      }
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      alert('Failed to restore student');
+document.addEventListener('DOMContentLoaded', function() {
+  const selectAllCheckbox = document.getElementById('selectAll');
+  const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+  const bulkRestoreBtn = document.getElementById('bulkRestoreBtn');
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  const selectedCount = document.getElementById('selectedCount');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', function() {
+      studentCheckboxes.forEach(checkbox => checkbox.checked = this.checked);
+      updateBulkActions();
     });
   }
+
+  studentCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      updateBulkActions();
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = Array.from(studentCheckboxes).every(cb => cb.checked);
+      }
+    });
+  });
+
+  function updateBulkActions() {
+    const checkedCount = document.querySelectorAll('.student-checkbox:checked').length;
+    if (selectedCount) selectedCount.textContent = `(${checkedCount} selected)`;
+    if (bulkRestoreBtn) bulkRestoreBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+    if (bulkDeleteBtn) bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+  }
+});
+
+function bulkRestoreStudents() {
+  const checkedBoxes = document.querySelectorAll('.student-checkbox:checked');
+  const studentIds = Array.from(checkedBoxes).map(cb => cb.dataset.studentId);
+  const studentNames = Array.from(checkedBoxes).map(cb => cb.dataset.studentName);
+
+  if (studentIds.length === 0) return alert('Please select at least one student.');
+
+  fetch(`<?= base_url('admin/students/bulkRestore') ?>`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+    body: JSON.stringify({ student_ids: studentIds })
+  })
+  .then(response => response.json())
+  .then(data => {
+    alert(data.success ? data.message : 'Error: ' + data.error);
+    if (data.success) location.reload();
+  })
+  .catch(() => alert('Failed to restore students'));
+}
+
+function bulkDeleteStudents() {
+  const checkedBoxes = document.querySelectorAll('.student-checkbox:checked');
+  const studentIds = Array.from(checkedBoxes).map(cb => cb.dataset.studentId);
+  const studentNames = Array.from(checkedBoxes).map(cb => cb.dataset.studentName);
+
+  if (studentIds.length === 0) return alert('Please select at least one student.');
+
+  fetch(`<?= base_url('admin/students/bulkDeletePermanently') ?>`, {
+    method: 'DELETE',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+    body: JSON.stringify({ student_ids: studentIds })
+  })
+  .then(response => response.json())
+  .then(data => {
+    alert(data.success ? data.message : 'Error: ' + data.error);
+    if (data.success) location.reload();
+  })
+  .catch(() => alert('Failed to delete students'));
+}
+
+function restoreStudent(studentId, studentName) {
+  if (typeof studentName === 'undefined' || studentName === null) studentName = '';
+  fetch(`<?= base_url('admin/students/restore') ?>/${studentId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert(data.message);
+      location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to restore student'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Failed to restore student');
+  });
 }
 
 // Delete student permanently function
 function deleteStudentPermanently(studentId, studentName) {
-  if (confirm(`Are you sure you want to PERMANENTLY DELETE student "${studentName}"? This action cannot be undone and will remove all their data from the system.`)) {
-    if (confirm(`This is your final warning. Permanently deleting "${studentName}" will remove all their records, grades, and documents. Are you absolutely sure?`)) {
-      fetch(`<?= base_url('admin/students/delete-permanently') ?>/${studentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert(data.message);
-          location.reload();
-        } else {
-          alert('Error: ' + data.error);
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to delete student permanently');
-      });
+  if (typeof studentName === 'undefined' || studentName === null) studentName = '';
+  fetch(`<?= base_url('admin/students/delete-permanently') ?>/${studentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
     }
-  }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert(data.message);
+      location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to delete student permanently'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Failed to delete student permanently');
+  });
 }
 </script>
 

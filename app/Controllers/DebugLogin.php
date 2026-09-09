@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 class DebugLogin extends BaseController

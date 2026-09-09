@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -37,7 +36,7 @@ class SubjectModel extends Model
     protected $validationRules = [
         'subject_code' => 'required|max_length[20]|is_unique[subjects.subject_code,id,{id}]',
         'subject_name' => 'required|max_length[255]',
-        'grade_level' => 'required|integer|greater_than[6]|less_than[11]',
+        'grade_level' => 'required|integer|greater_than_equal_to[0]|less_than[7]',
         'units' => 'decimal|greater_than[0]'
     ];
     protected $validationMessages = [];
@@ -99,5 +98,39 @@ class SubjectModel extends Model
                     ->orderBy('grade_level', 'ASC')
                     ->orderBy('subject_name', 'ASC')
                     ->findAll();
+    }
+
+    /**
+     * Get subjects assigned to a specific section
+     */
+    public function getSectionSubjects($sectionId)
+    {
+        $db = \Config\Database::connect();
+        return $db->table('subjects s')
+            ->select('s.*')
+            ->join('section_subjects ss', 'ss.subject_id = s.id')
+            ->where('ss.section_id', $sectionId)
+            ->where('s.is_active', true)
+            ->orderBy('s.subject_name', 'ASC')
+            ->get()->getResultArray();
+    }
+
+    /**
+     * Get subjects NOT assigned to a specific section (for adding)
+     */
+    public function getAvailableSubjectsForSection($sectionId, $gradeLevel)
+    {
+        $db = \Config\Database::connect();
+        return $db->table('subjects s')
+            ->select('s.*')
+            ->where('s.grade_level', $gradeLevel)
+            ->where('s.is_active', true)
+            ->whereNotIn('s.id', function($builder) use ($sectionId) {
+                return $builder->select('subject_id')
+                    ->from('section_subjects')
+                    ->where('section_id', $sectionId);
+            })
+            ->orderBy('s.subject_name', 'ASC')
+            ->get()->getResultArray();
     }
 }

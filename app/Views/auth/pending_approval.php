@@ -10,7 +10,7 @@
   justify-content: center;
   padding: 4rem 1rem;
   position: relative;
-  margin: -2rem -15px -2rem -15px;
+  margin: -2rem -15px 0 -15px;
 }
 
 .pending-container::before {
@@ -61,7 +61,7 @@
   font-weight: 800;
   color: white;
   margin-bottom: 0.5rem;
-  font-family: 'Times New Roman', serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .pending-subtitle {
@@ -116,6 +116,9 @@
   display: inline-block;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+  min-height: 48px;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .back-btn:hover {
@@ -123,6 +126,230 @@
   box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
   color: white;
   text-decoration: none;
+}
+
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+
+@media (max-width: 767.98px) {
+  .pending-container {
+    padding: 2rem 0.75rem;
+    margin: -2rem -15px 0 -15px;
+  }
+  
+  .pending-card {
+    max-width: 450px;
+    border-radius: 16px;
+  }
+  
+  .pending-header {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+  
+  .pending-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 1rem;
+  }
+  
+  .pending-icon i {
+    font-size: 1.6rem !important;
+  }
+  
+  .pending-title {
+    font-size: 1.6rem;
+  }
+  
+  .pending-subtitle {
+    font-size: 0.9rem;
+  }
+  
+  .pending-body {
+    padding: 1.5rem;
+  }
+  
+  .pending-message {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .pending-steps {
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .pending-steps h6 {
+    font-size: 0.95rem;
+  }
+  
+  .pending-steps ol {
+    font-size: 0.9rem;
+    padding-left: 1.1rem;
+  }
+  
+  .back-btn {
+    padding: 0.625rem 1.5rem;
+    font-size: 0.95rem;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pending-container {
+    padding: 1.5rem 0.5rem;
+  }
+  
+  .pending-card {
+    border-radius: 14px;
+    max-width: 100%;
+  }
+  
+  .pending-header {
+    padding: 1.5rem 1rem 1.25rem;
+  }
+  
+  .pending-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 0.75rem;
+  }
+  
+  .pending-icon i {
+    font-size: 1.4rem !important;
+  }
+  
+  .pending-title {
+    font-size: 1.3rem;
+    margin-bottom: 0.35rem;
+  }
+  
+  .pending-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .pending-body {
+    padding: 1.25rem;
+  }
+  
+  .pending-message {
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+    line-height: 1.5;
+  }
+  
+  .pending-steps {
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  
+  .pending-steps h6 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .pending-steps ol {
+    font-size: 0.85rem;
+    padding-left: 1rem;
+  }
+  
+  .pending-steps li {
+    margin-bottom: 0.35rem;
+  }
+  
+  .back-btn {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.9rem;
+    min-height: 40px;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 359px) {
+  .pending-header {
+    padding: 1.25rem 0.75rem 1rem;
+  }
+  
+  .pending-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0.5rem;
+  }
+  
+  .pending-icon i {
+    font-size: 1.2rem !important;
+  }
+  
+  .pending-title {
+    font-size: 1.1rem;
+  }
+  
+  .pending-body {
+    padding: 1rem;
+  }
+  
+  .pending-message {
+    font-size: 0.85rem;
+  }
+  
+  .pending-steps {
+    padding: 0.75rem;
+  }
+  
+  .back-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    min-height: 36px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .pending-container {
+    height: auto;
+    min-height: auto;
+    padding: 1rem 0.5rem;
+  }
+  
+  .pending-header {
+    padding: 1rem 1rem 0.75rem;
+  }
+  
+  .pending-icon {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0.5rem;
+  }
+  
+  .pending-icon i {
+    font-size: 1.1rem !important;
+  }
+  
+  .pending-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .pending-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .pending-body {
+    padding: 0.75rem 1rem;
+  }
+  
+  .pending-message {
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .pending-steps {
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .back-btn {
+    padding: 0.375rem 1rem;
+    min-height: 34px;
+    font-size: 0.8rem;
+  }
 }
 </style>
 
@@ -138,7 +365,7 @@
 
     <div class="pending-body">
       <p class="pending-message">
-        Thank you for submitting your enrollment application to Lourdes Provincial High School. 
+        Thank you for submitting your enrollment application to Cauayan South Central School. 
         Your application is currently being reviewed by our administration team.
       </p>
 
@@ -154,7 +381,8 @@
 
       <p class="pending-message">
         <strong>Need help?</strong><br>
-        Contact our enrollment office at <strong>info@lphs.edu.ph</strong> or call <strong>+63 38 502 9000</strong>
+        Contact us at <strong>302002@deped.gov.ph</strong> or visit the school office.<br>
+        <small>Mabini Street, District I, Cauayan City, Isabela, Philippines (WQ8Q+J5V / WQJC+MM7, Cauayan City)</small>
       </p>
 
       <a href="<?= base_url('login') ?>" class="back-btn">

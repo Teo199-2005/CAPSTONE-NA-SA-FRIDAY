@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
@@ -22,21 +21,15 @@ class PasswordResets extends BaseController
      */
     public function index()
     {
-        // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
-            return redirect()->to(base_url('/'));
-        }
-
-        // Get all requests with details
         try {
             $this->resetRequestModel->markExpiredRequests();
             $requests = $this->resetRequestModel->getAllRequestsWithDetails();
         } catch (\Exception $e) {
             $requests = [];
         }
-
+        
         return view('admin/password_resets', [
-            'title' => 'Password Reset Requests - LPHS SMS',
+            'title' => 'Password Reset Requests - CSCS SMS',
             'requests' => $requests,
             'table_missing' => false
         ]);
@@ -48,7 +41,11 @@ class PasswordResets extends BaseController
     public function approve($requestId)
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -69,18 +66,17 @@ class PasswordResets extends BaseController
         $success = $this->resetRequestModel->approveRequest($requestId, $adminId, $notes);
 
         if ($success) {
-            // Redirect to student view page with password reset functionality
-            $studentId = $request['student_id'];
-            
             return $this->response->setJSON([
                 'success' => true,
-                'redirect' => base_url("admin/students/view/{$studentId}?password_reset=true"),
-                'message' => 'Password reset request approved. Redirecting to student page...'
+                'redirect' => base_url("admin/password-resets/change/{$requestId}"),
+                'message' => 'Password reset request approved. Redirecting to change password...',
+                'csrf_hash' => csrf_hash()
             ]);
         }
 
         return $this->response->setStatusCode(500)->setJSON([
-            'error' => 'Failed to approve password reset request.'
+            'error' => 'Failed to approve password reset request.',
+            'csrf_hash' => csrf_hash()
         ]);
     }
 
@@ -90,7 +86,11 @@ class PasswordResets extends BaseController
     public function reject($requestId)
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -102,12 +102,14 @@ class PasswordResets extends BaseController
         if ($success) {
             return $this->response->setJSON([
                 'success' => true,
-                'message' => 'Password reset request rejected.'
+                'message' => 'Password reset request rejected.',
+                'csrf_hash' => csrf_hash()
             ]);
         }
 
         return $this->response->setStatusCode(500)->setJSON([
-            'error' => 'Failed to reject password reset request.'
+            'error' => 'Failed to reject password reset request.',
+            'csrf_hash' => csrf_hash()
         ]);
     }
 
@@ -117,7 +119,11 @@ class PasswordResets extends BaseController
     public function getRequestDetails($requestId)
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -141,7 +147,11 @@ class PasswordResets extends BaseController
     public function generateResetLink($requestId)
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -166,7 +176,11 @@ class PasswordResets extends BaseController
     public function getCount()
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -196,7 +210,11 @@ class PasswordResets extends BaseController
     public function approveAll()
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -216,12 +234,14 @@ class PasswordResets extends BaseController
         if ($success) {
             return $this->response->setJSON([
                 'success' => true,
-                'message' => 'All pending requests approved successfully.'
+                'message' => 'All pending requests approved successfully.',
+                'csrf_hash' => csrf_hash()
             ]);
         }
 
         return $this->response->setStatusCode(500)->setJSON([
-            'error' => 'Failed to approve all requests.'
+            'error' => 'Failed to approve all requests.',
+            'csrf_hash' => csrf_hash()
         ]);
     }
 
@@ -231,7 +251,11 @@ class PasswordResets extends BaseController
     public function rejectAll()
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -251,12 +275,14 @@ class PasswordResets extends BaseController
         if ($success) {
             return $this->response->setJSON([
                 'success' => true,
-                'message' => 'All pending requests rejected successfully.'
+                'message' => 'All pending requests rejected successfully.',
+                'csrf_hash' => csrf_hash()
             ]);
         }
 
         return $this->response->setStatusCode(500)->setJSON([
-            'error' => 'Failed to reject all requests.'
+            'error' => 'Failed to reject all requests.',
+            'csrf_hash' => csrf_hash()
         ]);
     }
 
@@ -266,7 +292,11 @@ class PasswordResets extends BaseController
     public function delete($requestId)
     {
         // Check if user is admin
-        if (!auth()->user()->inGroup('admin')) {
+        try {
+            if (!auth()->loggedIn() || ! is_any_admin()) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            }
+        } catch (\Exception $e) {
             return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
         }
 
@@ -275,12 +305,123 @@ class PasswordResets extends BaseController
         if ($success) {
             return $this->response->setJSON([
                 'success' => true,
-                'message' => 'Password reset request deleted successfully.'
+                'message' => 'Password reset request deleted successfully.',
+                'csrf_hash' => csrf_hash()
             ]);
         }
 
         return $this->response->setStatusCode(500)->setJSON([
-            'error' => 'Failed to delete password reset request.'
+            'error' => 'Failed to delete password reset request.',
+            'csrf_hash' => csrf_hash()
         ]);
     }
+
+    /**
+     * Show password change page for approved request
+     */
+    public function change($requestId)
+    {
+        $db = \Config\Database::connect();
+        $request = $db->table('password_reset_requests')
+            ->where('id', $requestId)
+            ->get()
+            ->getRowArray();
+        
+        if (!$request) {
+            return redirect()->to('admin/password-resets')->with('error', 'Request not found');
+        }
+        
+        return view('admin/password_reset_change', [
+            'title' => 'Change Password - CSCS SMS',
+            'reset' => $request
+        ]);
+    }
+
+    /**
+     * Process password change
+     */
+    public function changePassword()
+    {
+        $resetId = $this->request->getPost('reset_id');
+        $newPassword = $this->request->getPost('new_password');
+        $confirmPassword = $this->request->getPost('confirm_password');
+
+        if (!$resetId || !$newPassword || !$confirmPassword) {
+            return redirect()->back()->with('error', 'All fields are required.');
+        }
+
+        if ($newPassword !== $confirmPassword) {
+            return redirect()->back()->with('error', 'Passwords do not match.');
+        }
+
+        if (strlen($newPassword) < 6) {
+            return redirect()->back()->with('error', 'Password must be at least 6 characters long.');
+        }
+
+        $request = $this->resetRequestModel->find($resetId);
+        if (!$request) {
+            return redirect()->back()->with('error', 'Reset request not found.');
+        }
+
+        // Update password in auth_identities table
+        $db = \Config\Database::connect();
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        
+        // Delete ALL existing auth_identities for this user (all types)
+        $db->table('auth_identities')
+            ->where('user_id', $request['user_id'])
+            ->delete();
+        
+        // Also delete from auth_tokens and auth_remember_tokens if they exist
+        try {
+            $db->table('auth_tokens')->where('user_id', $request['user_id'])->delete();
+            $db->table('auth_remember_tokens')->where('user_id', $request['user_id'])->delete();
+        } catch (\Exception $e) {
+            // Tables might not exist, ignore
+        }
+        
+        // Get clean email without mailto: prefixes
+        $cleanEmail = str_replace('mailto:', '', $request['email']);
+        
+        // Create new auth identity with the new password
+        $updated = $db->table('auth_identities')->insert([
+            'user_id' => $request['user_id'],
+            'type' => 'email_password',
+            'name' => $cleanEmail,
+            'secret' => $hashedPassword,
+            'secret2' => null,
+            'expires' => null,
+            'extra' => null,
+            'force_reset' => 0,
+            'last_used_at' => null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        if ($updated) {
+            // Mark request as used
+            $this->resetRequestModel->update($resetId, ['status' => 'used']);
+            
+            return redirect()->to('admin/password-resets')->with('success', 'Password changed successfully!');
+        }
+        
+        return redirect()->back()->with('error', 'Failed to update password.');
+    }
+
+    /**
+     * Debug method to show all requests - restricted to master admin only
+     */
+    public function debug()
+    {
+        helper('admin_access');
+        if (! function_exists('is_master_admin') || ! is_master_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+        
+        $requests = $this->resetRequestModel->findAll();
+        echo '<h3>All Password Reset Requests:</h3>';
+        echo '<pre>' . print_r($requests, true) . '</pre>';
+        die();
+    }
 }
+

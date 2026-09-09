@@ -3,12 +3,10 @@
 namespace App\Controllers\Teacher;
 
 use App\Controllers\BaseController;
-use App\Models\StudentModel;
-use App\Models\GradeModel;
-use App\Models\TeacherModel;
-use App\Models\SubjectModel;
 use App\Models\SectionModel;
-use App\Models\AttendanceModel;
+use App\Models\StudentModel;
+use App\Models\SubjectModel;
+use App\Models\TeacherModel;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
@@ -23,322 +21,441 @@ class Analytics extends BaseController
 
     public function index()
     {
-        // Check authentication
-        if (!$this->auth->loggedIn()) {
+        if (! $this->auth->loggedIn()) {
             return redirect()->to(base_url('login'));
+        }
+
+        if (! $this->auth->user()->inGroup('teacher')) {
+            return redirect()->to(base_url('/'))->with('error', 'Access denied.');
         }
 
         $userId = $this->auth->id();
         $teacherModel = new TeacherModel();
-        $studentModel = new StudentModel();
-        $gradeModel = new GradeModel();
-        $subjectModel = new SubjectModel();
-        $sectionModel = new SectionModel();
-
-        // Get the actual logged-in teacher
         $teacher = $teacherModel->where('user_id', $userId)->first();
 
-        if (!$teacher) {
+        if (! $teacher) {
+            helper('school_year');
+
             return view('teacher/analytics', [
-                'title' => 'Class Analytics - LPHS SMS',
-                'error' => 'Teacher record not found'
+                'title' => 'Class Analytics - CSCS SMS',
+                'error' => 'Teacher record not found',
+                'schoolYear' => get_current_school_year(),
+                'currentTerm' => get_current_term(),
+                'analyticsSectionCount' => 0,
+                'analytics' => $this->getEmptyAnalytics(0),
             ]);
         }
 
-        // Use current school year and quarter
-        $schoolYear = '2025-2026';
-        $currentQuarter = 1;
+        helper('school_year');
+        $schoolYear = get_current_school_year();
+        $currentTerm = get_current_term();
 
-        // Get the section info for display
-        $teacherSection = $sectionModel->where('adviser_id', $teacher['id'])->first();
+        $scope = $this->collectScopedStudentsAndSubjects($teacher, $schoolYear);
+        $myStudents = $scope['students'];
+        $mySubjects = $scope['subjects'];
+        $teacherSection = $scope['primarySection'];
+        $sectionCount = count($scope['sectionIds']);
 
-        // Get students from sections where this teacher is adviser
-        $myStudents = $studentModel->select('students.*, sections.section_name, sections.grade_level as section_grade')
-            ->join('sections', 'sections.id = students.section_id', 'left')
-            ->where('sections.adviser_id', $teacher['id'])
-            ->where('students.enrollment_status', 'enrolled')
-            ->findAll();
+        $analytics = $this->calculateAnalytics($myStudents, $mySubjects, $schoolYear, $currentTerm, (int) $teacher['id']);
 
-        // Get subjects for the grade levels of advised students
-        $mySubjects = [];
-        if (!empty($myStudents)) {
-            $gradeLevels = array_unique(array_column($myStudents, 'grade_level'));
-            $mySubjects = $subjectModel->whereIn('grade_level', $gradeLevels)
-                ->where('is_active', true)
-                ->findAll();
+        $analytics['attendanceRecords'] = $this->getAttendanceRecords((int) $teacher['id'], $myStudents);
+        $analytics['attendanceStats'] = $this->calculateAttendanceStats($analytics['attendanceRecords']);
+        $analytics['attendanceRate'] = $analytics['attendanceStats']['attendanceRate'];
+
+        if (! empty($analytics['studentPerformance'])) {
+            usort($analytics['studentPerformance'], static fn ($a, $b) => $b['average'] <=> $a['average']);
         }
 
-        // Calculate actual analytics from grades
-        $analytics = $this->calculateAnalytics($myStudents, $mySubjects, $schoolYear, $currentQuarter, $teacher['id']);
-        
-        // If no real grades found, use empty analytics
         if ($analytics['classAverage'] == 0 && empty($analytics['subjectAverages'])) {
-            $analytics = $this->getEmptyAnalytics(count($myStudents));
-        }
-        
-        // Add attendance analytics
-        $attendanceModel = new AttendanceModel();
-        if ($teacher) {
-            $attendanceStats = $attendanceModel->getAttendanceStats($teacher['id'], date('Y-m-01'), date('Y-m-d'));
-            $analytics['attendanceStats'] = $this->processAttendanceStats($attendanceStats);
+            $emptyAnalytics = $this->getEmptyAnalytics(count($myStudents));
+            if (isset($analytics['attendanceStats']) && $analytics['attendanceStats']['total'] > 0) {
+                $emptyAnalytics['attendanceStats'] = $analytics['attendanceStats'];
+                $emptyAnalytics['attendanceRecords'] = $analytics['attendanceRecords'];
+                $emptyAnalytics['attendanceRate'] = $analytics['attendanceRate'];
+            }
+            $emptyAnalytics['termTrends'] = $analytics['termTrends'];
+            $emptyAnalytics['studentsGradedForDistribution'] = (int) ($analytics['studentsGradedForDistribution'] ?? 0);
+            $analytics = $emptyAnalytics;
         }
 
         return view('teacher/analytics', [
-            'title' => 'Class Analytics - LPHS SMS',
+            'title' => 'Class Analytics - CSCS SMS',
             'teacher' => $teacher,
             'myStudents' => $myStudents,
             'mySubjects' => $mySubjects,
             'analytics' => $analytics,
             'schoolYear' => $schoolYear,
-            'currentQuarter' => $currentQuarter,
-            'teacherSection' => $teacherSection
+            'currentTerm' => $currentTerm,
+            'teacherSection' => $teacherSection,
+            'analyticsSectionCount' => $sectionCount,
         ]);
     }
 
-    private function calculateAnalytics($students, $subjects, $schoolYear, $currentQuarter, $teacherId = null)
+    /**
+     * Students in sections where this teacher is adviser or on their schedule for the school year;
+     * subjects = union of section subjects for those sections.
+     *
+     * @return array{students: list<array>, subjects: list<array>, sectionIds: list<int>, primarySection: ?array}
+     */
+    private function collectScopedStudentsAndSubjects(array $teacher, string $schoolYear): array
     {
-        $gradeModel = new GradeModel();
+        $db = \Config\Database::connect();
+        $sectionModel = new SectionModel();
+        $studentModel = new StudentModel();
+        $subjectModel = new SubjectModel();
 
+        $advisorySections = $sectionModel->where('adviser_id', $teacher['id'])->findAll();
+        $advisoryIds = array_column($advisorySections, 'id');
+
+        $scheduleRows = $db->table('teacher_schedules')
+            ->select('section_id')
+            ->where('teacher_id', $teacher['id'])
+            ->where('school_year', $schoolYear)
+            ->groupBy('section_id')
+            ->get()
+            ->getResultArray();
+        $scheduledIds = array_column($scheduleRows, 'section_id');
+
+        $allSectionIds = array_values(array_unique(array_filter(array_merge($advisoryIds, array_map('intval', $scheduledIds)))));
+
+        if ($allSectionIds === []) {
+            return [
+                'students' => [],
+                'subjects' => [],
+                'sectionIds' => [],
+                'primarySection' => null,
+            ];
+        }
+
+        $students = $studentModel
+            ->select('students.*, sections.section_name, sections.grade_level as section_grade')
+            ->join('sections', 'sections.id = students.section_id', 'left')
+            ->whereIn('students.section_id', $allSectionIds)
+            ->where('students.enrollment_status', 'enrolled')
+            ->orderBy('students.last_name', 'ASC')
+            ->orderBy('students.first_name', 'ASC')
+            ->findAll();
+
+        $seen = [];
+        $uniqueStudents = [];
+        foreach ($students as $s) {
+            $id = (int) $s['id'];
+            if (! isset($seen[$id])) {
+                $seen[$id] = true;
+                $uniqueStudents[] = $s;
+            }
+        }
+
+        $subjectsById = [];
+        foreach ($allSectionIds as $sid) {
+            foreach ($subjectModel->getSectionSubjects((int) $sid) as $sub) {
+                $subjectsById[(int) $sub['id']] = $sub;
+            }
+        }
+
+        $primarySection = $advisorySections[0] ?? $sectionModel->find($allSectionIds[0]);
+
+        return [
+            'students' => $uniqueStudents,
+            'subjects' => array_values($subjectsById),
+            'sectionIds' => $allSectionIds,
+            'primarySection' => $primarySection,
+        ];
+    }
+
+    private function calculateAnalytics(array $students, array $subjects, string $schoolYear, int $currentTerm, ?int $teacherId = null): array
+    {
         $analytics = [
             'totalStudents' => count($students),
             'totalSubjects' => count($subjects),
             'gradeDistribution' => [
-                'excellent' => 0, // 90-100
-                'very_good' => 0, // 85-89
-                'good' => 0,      // 80-84
-                'fair' => 0,      // 75-79
-                'passing' => 0,   // 70-74
-                'failing' => 0    // <70
+                'excellent' => 0,
+                'very_good' => 0,
+                'good' => 0,
+                'fair' => 0,
+                'passing' => 0,
+                'failing' => 0,
             ],
             'subjectAverages' => [],
-            'quarterTrends' => [],
+            'termTrends' => [],
             'studentPerformance' => [],
-            'attendanceRate' => 0, // Will be calculated from actual data
-            'improvementRate' => 0, // Will be calculated from actual data
-            'classAverage' => 0
+            'attendanceRate' => 0,
+            'improvementRate' => 0,
+            'classAverage' => 0,
+            'studentsGradedForDistribution' => 0,
         ];
 
-        if (empty($students)) {
-            log_message('info', 'No students found for teacher ID: ' . ($teacherId ?? 'unknown'));
+        if ($students === [] || $subjects === []) {
+            $analytics['termTrends'] = $this->buildTermTrendsFromDb($students, $subjects, $schoolYear);
+
             return $analytics;
         }
-        
-        log_message('info', 'Calculating analytics for ' . count($students) . ' students, school year: ' . $schoolYear . ', quarter: ' . $currentQuarter . ', teacher ID: ' . ($teacherId ?? 'unknown'));
+
+        $studentIds = array_map(static fn ($s) => (int) $s['id'], $students);
+        $subjectIds = array_map(static fn ($s) => (int) $s['id'], $subjects);
+        $gradeMap   = $this->loadScopedGradeMap($studentIds, $subjectIds, $schoolYear, $currentTerm);
 
         $totalGrades = 0;
-        $gradeCount = 0;
+        $gradeCount  = 0;
 
-        // Calculate grade distribution and subject averages
         foreach ($subjects as $subject) {
+            $subjectId     = (int) $subject['id'];
             $subjectGrades = [];
-
             foreach ($students as $student) {
-                // Get grades for this specific student and subject
-                $grade = $gradeModel->where('student_id', $student['id'])
-                    ->where('subject_id', $subject['id'])
-                    ->where('school_year', $schoolYear)
-                    ->where('quarter', $currentQuarter)
-                    ->first();
-                    
-                // Debug: Log grade query
-                if (!$grade) {
-                    log_message('debug', 'No grade found for student ' . $student['id'] . ', subject ' . $subject['id'] . ', SY: ' . $schoolYear . ', Q: ' . $currentQuarter);
-                } else {
-                    log_message('debug', 'Found grade: ' . $grade['grade'] . ' for student ' . $student['id'] . ', subject ' . $subject['id']);
+                $key = (int) $student['id'] . '_' . $subjectId;
+                if (! isset($gradeMap[$key])) {
+                    continue;
                 }
-
-                if ($grade && $grade['grade'] !== null) {
-                    $gradeValue = (float)$grade['grade'];
-                    $subjectGrades[] = $gradeValue;
-                    $totalGrades += $gradeValue;
-                    $gradeCount++;
-
-                    // Grade distribution
-                    if ($gradeValue >= 90) {
-                        $analytics['gradeDistribution']['excellent']++;
-                    } elseif ($gradeValue >= 85) {
-                        $analytics['gradeDistribution']['very_good']++;
-                    } elseif ($gradeValue >= 80) {
-                        $analytics['gradeDistribution']['good']++;
-                    } elseif ($gradeValue >= 75) {
-                        $analytics['gradeDistribution']['fair']++;
-                    } elseif ($gradeValue >= 70) {
-                        $analytics['gradeDistribution']['passing']++;
-                    } else {
-                        $analytics['gradeDistribution']['failing']++;
-                    }
-                }
+                $g = $gradeMap[$key];
+                $subjectGrades[] = $g;
+                $totalGrades += $g;
+                $gradeCount++;
             }
 
-            if (!empty($subjectGrades)) {
+            if ($subjectGrades !== []) {
                 $analytics['subjectAverages'][] = [
-                    'subject' => $subject['subject_name'],
+                    'subject' => $subject['subject_name'] ?? 'Subject',
                     'average' => round(array_sum($subjectGrades) / count($subjectGrades), 2),
-                    'count' => count($subjectGrades)
+                    'count'   => count($subjectGrades),
                 ];
             }
         }
 
-        // Calculate overall class average
         if ($gradeCount > 0) {
             $analytics['classAverage'] = round($totalGrades / $gradeCount, 2);
         }
-        
-        // Calculate actual attendance rate if we have attendance data
-        if (isset($analytics['attendanceStats']) && $analytics['attendanceStats']['total'] > 0) {
-            $analytics['attendanceRate'] = $analytics['attendanceStats']['attendanceRate'];
-        }
-        
-        // Calculate improvement rate based on quarter comparison
-        if (count($analytics['quarterTrends']) >= 2) {
-            $currentAvg = $analytics['classAverage'];
-            $previousAvg = $analytics['quarterTrends'][0]['average'] ?? 0;
-            if ($previousAvg > 0) {
-                $analytics['improvementRate'] = round((($currentAvg - $previousAvg) / $previousAvg) * 100, 1);
-            }
-        }
 
-        // Calculate quarter trends based on actual data only
-        $analytics['quarterTrends'] = [];
-        for ($q = 1; $q <= 4; $q++) {
-            if ($q == $currentQuarter) {
-                $analytics['quarterTrends'][] = ['quarter' => 'Q' . $q, 'average' => $analytics['classAverage']];
-            } else {
-                // Only show 0 for other quarters since we don't have historical data
-                $analytics['quarterTrends'][] = ['quarter' => 'Q' . $q, 'average' => 0];
-            }
-        }
-
-        // Calculate individual student performance
+        $graded = 0;
         foreach ($students as $student) {
-            $studentGrades = $gradeModel->where('student_id', $student['id'])
-                ->where('school_year', $schoolYear)
-                ->where('quarter', $currentQuarter)
-                ->findAll();
-
-            if (!empty($studentGrades)) {
-                $studentAverage = array_sum(array_column($studentGrades, 'grade')) / count($studentGrades);
-                $analytics['studentPerformance'][] = [
-                    'name' => $student['first_name'] . ' ' . $student['last_name'],
-                    'average' => round($studentAverage, 2),
-                    'grade_count' => count($studentGrades)
-                ];
+            $vals = $this->scopedGradesForStudent((int) $student['id'], $subjectIds, $gradeMap);
+            if ($vals === []) {
+                continue;
             }
+            $graded++;
+            $avg = array_sum($vals) / count($vals);
+            $bucket = $this->gradeDistributionBucket($avg);
+            $analytics['gradeDistribution'][$bucket]++;
+            $analytics['studentPerformance'][] = [
+                'name'        => $student['first_name'] . ' ' . $student['last_name'],
+                'average'     => round($avg, 2),
+                'grade_count' => count($vals),
+            ];
+        }
+        $analytics['studentsGradedForDistribution'] = $graded;
+
+        $analytics['termTrends'] = $this->buildTermTrendsFromDb($students, $subjects, $schoolYear);
+
+        if ($currentTerm > 1) {
+            $prevAvg = $this->getClassAverageForTerm($students, $subjects, $schoolYear, $currentTerm - 1);
+            if ($prevAvg > 0 && $analytics['classAverage'] > 0) {
+                $analytics['improvementRate'] = round((($analytics['classAverage'] - $prevAvg) / $prevAvg) * 100, 1);
+            }
+        }
+
+        if ($teacherId) {
+            log_message('info', 'Teacher analytics: teacher_id=' . $teacherId . ' students=' . count($students) . ' subjects=' . count($subjects));
         }
 
         return $analytics;
     }
-    
-    private function processAttendanceStats($attendanceStats)
+
+    /**
+     * @param list<int> $studentIds
+     * @param list<int> $subjectIds
+     * @return array<string, float> keys "{studentId}_{subjectId}"
+     */
+    private function loadScopedGradeMap(array $studentIds, array $subjectIds, string $schoolYear, int $term): array
     {
-        $stats = [
-            'present' => 0,
-            'absent' => 0,
-            'late' => 0,
-            'excused' => 0,
-            'total' => 0,
-            'attendanceRate' => 0
-        ];
-        
-        foreach ($attendanceStats as $stat) {
-            $stats[$stat['status']] = (int)$stat['count'];
-            $stats['total'] += (int)$stat['count'];
+        if ($studentIds === [] || $subjectIds === []) {
+            return [];
         }
-        
-        if ($stats['total'] > 0) {
-            $stats['attendanceRate'] = round(($stats['present'] / $stats['total']) * 100, 2);
+
+        $db     = \Config\Database::connect();
+        $stPh   = implode(',', array_fill(0, count($studentIds), '?'));
+        $suPh   = implode(',', array_fill(0, count($subjectIds), '?'));
+        $sql    = "SELECT student_id, subject_id, grade FROM grades
+                   WHERE school_year = ? AND term = ?
+                   AND student_id IN ({$stPh}) AND subject_id IN ({$suPh})";
+        $params = array_merge([$schoolYear, $term], $studentIds, $subjectIds);
+        $rows   = $db->query($sql, $params)->getResultArray();
+
+        $map = [];
+        foreach ($rows as $row) {
+            if ($row['grade'] === null || $row['grade'] === '') {
+                continue;
+            }
+            $map[(int) $row['student_id'] . '_' . (int) $row['subject_id']] = (float) $row['grade'];
         }
-        
-        return $stats;
+
+        return $map;
     }
 
-    private function getCurrentQuarter()
+    /**
+     * @param list<int> $subjectIds
+     * @param array<string, float> $gradeMap
+     * @return list<float>
+     */
+    private function scopedGradesForStudent(int $studentId, array $subjectIds, array $gradeMap): array
     {
-        $month = (int)date('n');
-
-        if ($month >= 6 && $month <= 8) {
-            return 1; // June-August
-        } elseif ($month >= 9 && $month <= 11) {
-            return 2; // September-November
-        } elseif ($month >= 12 || $month <= 2) {
-            return 3; // December-February
-        } else {
-            return 4; // March-May
+        $vals = [];
+        foreach ($subjectIds as $subjectId) {
+            $key = $studentId . '_' . (int) $subjectId;
+            if (isset($gradeMap[$key])) {
+                $vals[] = $gradeMap[$key];
+            }
         }
+
+        return $vals;
+    }
+
+    private function gradeDistributionBucket(float $avg): string
+    {
+        if ($avg >= 90) {
+            return 'excellent';
+        }
+        if ($avg >= 85) {
+            return 'very_good';
+        }
+        if ($avg >= 80) {
+            return 'good';
+        }
+        if ($avg >= 75) {
+            return 'fair';
+        }
+        if ($avg >= 70) {
+            return 'passing';
+        }
+
+        return 'failing';
+    }
+
+    /**
+     * @param list<array> $students
+     * @param list<array> $subjects
+     * @return list<array{term:string,average:float|int}>
+     */
+    private function buildTermTrendsFromDb(array $students, array $subjects, string $schoolYear): array
+    {
+        if ($students === [] || $subjects === []) {
+            return [
+                ['term' => 'T1', 'average' => 0],
+                ['term' => 'T2', 'average' => 0],
+                ['term' => 'T3', 'average' => 0],
+            ];
+        }
+
+        $db = \Config\Database::connect();
+        $studentIds = array_column($students, 'id');
+        $subjectIds = array_column($subjects, 'id');
+        $stPh = implode(',', array_fill(0, count($studentIds), '?'));
+        $suPh = implode(',', array_fill(0, count($subjectIds), '?'));
+
+        $trends = [];
+        for ($t = 1; $t <= 3; $t++) {
+            $sql = "SELECT AVG(g.grade) as a FROM grades g
+                WHERE g.school_year = ? AND g.term = ?
+                AND g.student_id IN ({$stPh}) AND g.subject_id IN ({$suPh})";
+            $params = array_merge([$schoolYear, $t], $studentIds, $subjectIds);
+            $row = $db->query($sql, $params)->getRow();
+            $trends[] = [
+                'term' => 'T' . $t,
+                'average' => ($row && $row->a !== null) ? round((float) $row->a, 2) : 0,
+            ];
+        }
+
+        return $trends;
+    }
+
+    /**
+     * @param list<array> $students
+     * @param list<array> $subjects
+     */
+    private function getClassAverageForTerm(array $students, array $subjects, string $schoolYear, int $term): float
+    {
+        if ($students === [] || $subjects === []) {
+            return 0.0;
+        }
+
+        $db = \Config\Database::connect();
+        $studentIds = array_column($students, 'id');
+        $subjectIds = array_column($subjects, 'id');
+        $stPh = implode(',', array_fill(0, count($studentIds), '?'));
+        $suPh = implode(',', array_fill(0, count($subjectIds), '?'));
+        $sql = "SELECT AVG(g.grade) as a FROM grades g
+            WHERE g.school_year = ? AND g.term = ?
+            AND g.student_id IN ({$stPh}) AND g.subject_id IN ({$suPh})";
+        $params = array_merge([$schoolYear, $term], $studentIds, $subjectIds);
+        $row = $db->query($sql, $params)->getRow();
+
+        return ($row && $row->a !== null) ? round((float) $row->a, 2) : 0.0;
     }
 
     public function exportPdf()
     {
-        if (!$this->auth->loggedIn()) {
+        if (! $this->auth->loggedIn()) {
             return redirect()->to(base_url('login'));
         }
 
-        // Increase execution time for PDF generation
+        helper(['admin_access', 'school_year']);
+
         set_time_limit(120);
         ini_set('memory_limit', '256M');
-        
-        $teacherModel = new TeacherModel();
-        $studentModel = new StudentModel();
-        $gradeModel = new GradeModel();
-        $subjectModel = new SubjectModel();
-        $sectionModel = new SectionModel();
 
-        // Get the teacher - either logged in teacher or specific teacher for admin
-        $userId = $this->auth->id();
+        $teacherModel = new TeacherModel();
         $teacher = null;
-        
-        // Check if user is admin accessing from announcement
-        if ($this->auth->user()->inGroup('admin')) {
-            // For admin, get teacher from announcement context or URL parameter
+        $userId = $this->auth->id();
+
+        $teacherIdParam = $this->request->getGet('teacher_id');
+        if (is_any_admin() && $teacherIdParam !== null && $teacherIdParam !== '') {
+            $tid = (int) $teacherIdParam;
+            if ($tid > 0) {
+                $teacher = $teacherModel->find($tid);
+            }
+        }
+
+        if (! $teacher && is_any_admin()) {
             $teacherName = $this->request->getGet('teacher');
             if ($teacherName) {
-                // Parse teacher name from parameter
-                $nameParts = explode(' ', $teacherName, 2);
+                $nameParts = explode(' ', trim((string) $teacherName), 2);
                 $firstName = $nameParts[0] ?? '';
                 $lastName = $nameParts[1] ?? '';
-                
-                $teacher = $teacherModel->where('first_name', $firstName)
-                                       ->where('last_name', $lastName)
-                                       ->first();
+                $matches = $teacherModel->where('first_name', $firstName)->where('last_name', $lastName)->findAll();
+                $teacher = count($matches) === 1 ? $matches[0] : null;
             }
-            
-            // Fallback to first active teacher if not found
-            if (!$teacher) {
-                $teacher = $teacherModel->where('employment_status', 'active')->first();
+        }
+
+        if (! $teacher) {
+            if (! $this->auth->user()->inGroup('teacher')) {
+                return redirect()->to(base_url('/'))->with('error', 'Teacher not found or access denied.');
             }
-        } else {
-            // For regular teacher, get their own record
             $teacher = $teacherModel->where('user_id', $userId)->first();
         }
 
-        if (!$teacher) {
+        if (! $teacher) {
             return redirect()->back()->with('error', 'Teacher record not found');
         }
 
-        // Use fixed school year and quarter where we have data
-        $schoolYear = '2025-2026';
-        $currentQuarter = 1;
-
-        // Get students from sections where this teacher is adviser
-        $myStudents = $studentModel->select('students.*, sections.section_name')
-            ->join('sections', 'sections.id = students.section_id', 'left')
-            ->where('sections.adviser_id', $teacher['id'])
-            ->where('students.enrollment_status', 'enrolled')
-            ->findAll();
-
-        // Get subjects for the grade levels of advised students
-        $mySubjects = [];
-        if (!empty($myStudents)) {
-            $gradeLevels = array_unique(array_column($myStudents, 'grade_level'));
-            $mySubjects = $subjectModel->whereIn('grade_level', $gradeLevels)
-                ->where('is_active', true)
-                ->findAll();
+        if (! is_any_admin() && (int) $teacher['user_id'] !== (int) $userId) {
+            return redirect()->back()->with('error', 'Access denied');
         }
 
-        // Calculate analytics data - only real data, no demo
-        $analytics = $this->calculateAnalytics($myStudents, $mySubjects, $schoolYear, $currentQuarter, $teacher['id']);
-        
-        // If no grades found, use empty analytics
+        $schoolYear = get_current_school_year();
+        $currentTerm = get_current_term();
+
+        $scope = $this->collectScopedStudentsAndSubjects($teacher, $schoolYear);
+        $myStudents = $scope['students'];
+        $mySubjects = $scope['subjects'];
+
+        $analytics = $this->calculateAnalytics($myStudents, $mySubjects, $schoolYear, $currentTerm, (int) $teacher['id']);
+
+        $analytics['attendanceRecords'] = $this->getAttendanceRecords((int) $teacher['id'], $myStudents);
+        $analytics['attendanceStats'] = $this->calculateAttendanceStats($analytics['attendanceRecords']);
+        $analytics['attendanceRate'] = $analytics['attendanceStats']['attendanceRate'];
+
+        if (! empty($analytics['studentPerformance'])) {
+            usort($analytics['studentPerformance'], static fn ($a, $b) => $b['average'] <=> $a['average']);
+        }
+
         if ($analytics['classAverage'] == 0 && empty($analytics['subjectAverages'])) {
             $analytics = $this->getEmptyAnalytics(count($myStudents));
         }
@@ -349,107 +466,185 @@ class Analytics extends BaseController
             'mySubjects' => $mySubjects,
             'analytics' => $analytics,
             'schoolYear' => $schoolYear,
-            'currentQuarter' => $currentQuarter,
-            'reportDate' => date('F j, Y')
+            'currentTerm' => $currentTerm,
+            'reportDate' => date('F j, Y', time()),
+            'reportTime' => date('g:i A', time()),
         ];
 
         $html = view('teacher/analytics_pdf', $data);
-        
+
         $options = new Options();
-        $options->set('defaultFont', 'Times');
+        $options->set('defaultFont', 'Helvetica');
         $options->set('isRemoteEnabled', false);
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isPhpEnabled', false);
-        
+
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
-        
-        $filename = 'LPHS_Teacher_Analytics_Report_' . date('Y-m-d') . '.pdf';
-        $dompdf->stream($filename, ['Attachment' => false]);
+
+        $filename = 'CSCS_Teacher_Analytics_' . date('Y-m-d') . '.pdf';
+
+        return $this->sendPdfInline($dompdf, $filename);
     }
 
     public function sendToAdmin()
     {
-        if (!$this->auth->loggedIn()) {
+        if (! $this->auth->loggedIn()) {
             return $this->response->setJSON(['success' => false, 'error' => 'Unauthorized']);
         }
+
+        if (! $this->verifyAnalyticsCsrf()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'Invalid security token. Refresh the page and try again.']);
+        }
+
+        if (! $this->auth->user()->inGroup('teacher')) {
+            return $this->response->setJSON(['success' => false, 'error' => 'Teachers only']);
+        }
+
+        helper('school_year');
 
         $teacherModel = new TeacherModel();
         $userId = $this->auth->id();
         $teacher = $teacherModel->where('user_id', $userId)->first();
 
-        if (!$teacher) {
+        if (! $teacher) {
             return $this->response->setJSON(['success' => false, 'error' => 'Teacher not found']);
         }
 
-        $input = $this->request->getJSON(true);
-        $analytics = $input['analytics'] ?? [];
-        $schoolYear = $input['schoolYear'] ?? '2024-2025';
-        $currentQuarter = $input['currentQuarter'] ?? 1;
+        $schoolYear = get_current_school_year();
+        $currentTerm = get_current_term();
 
-        // Create announcement with analytics data
+        $scope = $this->collectScopedStudentsAndSubjects($teacher, $schoolYear);
+        $myStudents = $scope['students'];
+        $mySubjects = $scope['subjects'];
+
+        $analytics = $this->calculateAnalytics($myStudents, $mySubjects, $schoolYear, $currentTerm, (int) $teacher['id']);
+        $analytics['attendanceRecords'] = $this->getAttendanceRecords((int) $teacher['id'], $myStudents);
+        $analytics['attendanceStats'] = $this->calculateAttendanceStats($analytics['attendanceRecords']);
+        $analytics['attendanceRate'] = $analytics['attendanceStats']['attendanceRate'];
+
+        if ($analytics['classAverage'] == 0 && empty($analytics['subjectAverages'])) {
+            $analytics = $this->getEmptyAnalytics(count($myStudents));
+        }
+
         $announcementModel = model('AnnouncementModel');
-        
+
         $title = 'Class Analytics Report - ' . $teacher['first_name'] . ' ' . $teacher['last_name'];
-        $body = $this->formatAnalyticsForAnnouncement($analytics, $teacher, $schoolYear, $currentQuarter);
-        
+        $body = $this->formatAnalyticsForAnnouncement($analytics, $teacher, $schoolYear, $currentTerm);
+        $slug = 'class-analytics-t' . (int) $teacher['id'] . '-' . date('Y-m-d-H-i-s') . '-' . bin2hex(random_bytes(4));
+
         $announcementData = [
             'title' => $title,
-            'slug' => 'analytics-report-' . date('Y-m-d-H-i-s'),
+            'slug' => $slug,
             'body' => $body,
             'target_roles' => 'admin',
-            'published_at' => date('Y-m-d H:i:s'),
-            'created_by' => $this->auth->id()
+            'published_at' => date('Y-m-d H:i:s', time()),
+            'created_by' => $this->auth->id(),
         ];
 
         if ($announcementModel->save($announcementData)) {
             return $this->response->setJSON(['success' => true, 'message' => 'Analytics report sent to admin']);
-        } else {
-            return $this->response->setJSON(['success' => false, 'error' => 'Failed to create announcement']);
+        }
+
+        return $this->response->setJSON(['success' => false, 'error' => 'Failed to create announcement']);
+    }
+
+    private function formatAnalyticsForAnnouncement(array $analytics, array $teacher, string $schoolYear, int $currentTerm): string
+    {
+        $body = '<h4>Class Analytics Report</h4>';
+        $body .= '<p><strong>Teacher:</strong> ' . esc($teacher['first_name'] . ' ' . $teacher['last_name']) . '</p>';
+        $body .= '<p><strong>School Year:</strong> ' . esc($schoolYear) . '</p>';
+        $body .= '<p><strong>Term:</strong> ' . (int) $currentTerm . '</p>';
+        $body .= '<p><strong>Report Date:</strong> ' . date('F j, Y g:i A', time()) . '</p>';
+
+        $body .= '<h5>Summary Statistics</h5><ul>';
+        $body .= '<li>Total Students: ' . (int) ($analytics['totalStudents'] ?? 0) . '</li>';
+        $body .= '<li>Class Average: ' . number_format((float) ($analytics['classAverage'] ?? 0), 1) . '%</li>';
+        $body .= '<li>Attendance Rate: ' . number_format((float) ($analytics['attendanceRate'] ?? 0), 1) . '%</li>';
+        $body .= '<li>Improvement vs prior term: ' . number_format((float) ($analytics['improvementRate'] ?? 0), 1) . '%</li>';
+        $body .= '</ul>';
+
+        if (! empty($analytics['attendanceStats'])) {
+            $body .= '<h5>Attendance Details</h5><ul>';
+            $body .= '<li>Present: ' . (int) ($analytics['attendanceStats']['present'] ?? 0) . '</li>';
+            $body .= '<li>Absent: ' . (int) ($analytics['attendanceStats']['absent'] ?? 0) . '</li>';
+            $body .= '<li>Late: ' . (int) ($analytics['attendanceStats']['late'] ?? 0) . '</li>';
+            $body .= '<li>Excused: ' . (int) ($analytics['attendanceStats']['excused'] ?? 0) . '</li>';
+            $body .= '</ul>';
+        }
+
+        if (! empty($analytics['subjectAverages'])) {
+            $body .= '<h5>Subject Averages</h5><ul>';
+            foreach ($analytics['subjectAverages'] as $subject) {
+                $body .= '<li>' . esc($subject['subject']) . ': ' . number_format((float) $subject['average'], 1) . '%</li>';
+            }
+            $body .= '</ul>';
+        }
+
+        return $body;
+    }
+
+    private function getAttendanceRecords(int $teacherId, array $students): array
+    {
+        $db = \Config\Database::connect();
+        $studentIds = array_column($students, 'id');
+
+        if ($studentIds === []) {
+            return [];
+        }
+
+        $placeholders = str_repeat('?,', count($studentIds) - 1) . '?';
+        $query = "SELECT a.*, CONCAT(s.first_name, ' ', s.last_name) as student_name, s.lrn
+                  FROM attendance a
+                  JOIN students s ON s.id = a.student_id
+                  WHERE a.teacher_id = ? AND a.student_id IN ({$placeholders})
+                  ORDER BY a.date DESC, s.last_name ASC";
+
+        $params = array_merge([$teacherId], $studentIds);
+
+        return $db->query($query, $params)->getResultArray();
+    }
+
+    private function calculateAttendanceStats(array $attendanceRecords): array
+    {
+        $stats = [
+            'present' => 0,
+            'absent' => 0,
+            'late' => 0,
+            'excused' => 0,
+            'total' => 0,
+            'attendanceRate' => 0,
+        ];
+
+        foreach ($attendanceRecords as $record) {
+            $status = strtolower((string) $record['status']);
+            if (isset($stats[$status])) {
+                $stats[$status]++;
+            }
+            $stats['total']++;
+        }
+
+        if ($stats['total'] > 0) {
+            $presentLike = $stats['present'] + $stats['late'];
+            $stats['attendanceRate'] = round(($presentLike / $stats['total']) * 100, 1);
+        }
+
+        return $stats;
+    }
+
+    private function verifyAnalyticsCsrf(): bool
+    {
+        $security = \Config\Services::security();
+        try {
+            return $security->verify($this->request);
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
-    private function formatAnalyticsForAnnouncement($analytics, $teacher, $schoolYear, $currentQuarter)
-    {
-        $body = "<h4>Class Analytics Report</h4>";
-        $body .= "<p><strong>Teacher:</strong> {$teacher['first_name']} {$teacher['last_name']}</p>";
-        $body .= "<p><strong>School Year:</strong> {$schoolYear}</p>";
-        $body .= "<p><strong>Quarter:</strong> {$currentQuarter}</p>";
-        $body .= "<p><strong>Report Date:</strong> " . date('F j, Y g:i A') . "</p>";
-        
-        $body .= "<h5>Summary Statistics</h5>";
-        $body .= "<ul>";
-        $body .= "<li>Total Students: " . ($analytics['totalStudents'] ?? 0) . "</li>";
-        $body .= "<li>Class Average: " . number_format($analytics['classAverage'] ?? 0, 1) . "%</li>";
-        $body .= "<li>Attendance Rate: " . number_format($analytics['attendanceRate'] ?? 0, 1) . "%</li>";
-        $body .= "<li>Improvement Rate: +" . number_format($analytics['improvementRate'] ?? 0, 1) . "%</li>";
-        $body .= "</ul>";
-        
-        if (!empty($analytics['attendanceStats'])) {
-            $body .= "<h5>Attendance Details</h5>";
-            $body .= "<ul>";
-            $body .= "<li>Present: " . ($analytics['attendanceStats']['present'] ?? 0) . "</li>";
-            $body .= "<li>Absent: " . ($analytics['attendanceStats']['absent'] ?? 0) . "</li>";
-            $body .= "<li>Late: " . ($analytics['attendanceStats']['late'] ?? 0) . "</li>";
-            $body .= "<li>Excused: " . ($analytics['attendanceStats']['excused'] ?? 0) . "</li>";
-            $body .= "</ul>";
-        }
-        
-        if (!empty($analytics['subjectAverages'])) {
-            $body .= "<h5>Subject Averages</h5>";
-            $body .= "<ul>";
-            foreach ($analytics['subjectAverages'] as $subject) {
-                $body .= "<li>{$subject['subject']}: " . number_format($subject['average'], 1) . "%</li>";
-            }
-            $body .= "</ul>";
-        }
-        
-        return $body;
-    }
-    
-    private function getEmptyAnalytics($studentCount = 0)
+    private function getEmptyAnalytics(int $studentCount = 0): array
     {
         return [
             'totalStudents' => $studentCount,
@@ -460,31 +655,28 @@ class Analytics extends BaseController
                 'good' => 0,
                 'fair' => 0,
                 'passing' => 0,
-                'failing' => 0
+                'failing' => 0,
             ],
             'subjectAverages' => [],
-            'quarterTrends' => [
-                ['quarter' => 'Q1', 'average' => 0],
-                ['quarter' => 'Q2', 'average' => 0],
-                ['quarter' => 'Q3', 'average' => 0],
-                ['quarter' => 'Q4', 'average' => 0]
+            'termTrends' => [
+                ['term' => 'T1', 'average' => 0],
+                ['term' => 'T2', 'average' => 0],
+                ['term' => 'T3', 'average' => 0],
             ],
             'studentPerformance' => [],
             'attendanceRate' => 0,
             'improvementRate' => 0,
             'classAverage' => 0,
+            'attendanceRecords' => [],
+            'studentsGradedForDistribution' => 0,
             'attendanceStats' => [
                 'present' => 0,
                 'absent' => 0,
                 'late' => 0,
                 'excused' => 0,
                 'total' => 0,
-                'attendanceRate' => 0
-            ]
+                'attendanceRate' => 0,
+            ],
         ];
     }
 }
-
-
-
-

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 use App\Models\AnnouncementModel;
@@ -15,7 +14,14 @@ class Home extends BaseController
             $auth = auth();
             if ($auth->loggedIn()) {
                 $user = $auth->user();
-                if ($user->inGroup('admin')) {
+                helper('admin_access');
+                if (is_any_admin()) {
+                    if (is_admin_staff()) {
+                        $dest = admin_staff_post_login_redirect_url((int) $user->id);
+
+                        return redirect()->to($dest ?? base_url('/'));
+                    }
+
                     return redirect()->to(base_url('admin/dashboard'));
                 }
                 if ($user->inGroup('teacher')) {
@@ -34,7 +40,6 @@ class Home extends BaseController
 
         $announcements = [];
         $enrollmentData = [];
-        $predictionData = [];
         
         try {
             $model = new AnnouncementModel();
@@ -44,101 +49,115 @@ class Home extends BaseController
         }
         
         try {
-            $enrollmentData = $this->getEnrollmentData();
-            $predictionData = $this->generatePredictions($enrollmentData);
-            $monthlyEnrollmentData = $this->getMonthlyEnrollmentData();
+            $enrollmentData = $this->getEnrollmentDataFromDB();
+            $selectedYear = $this->request->getGet('year') ?? date('Y');
+            $monthlyEnrollmentData = $this->getMonthlyEnrollmentData($selectedYear);
+            $availableYears = $this->getAvailableYears();
         } catch (\Throwable $e) {
-            // Handle database errors gracefully
-            $monthlyEnrollmentData = [5, 4, 1, 4, 7, 63, 51, 27, 11, 14, 3, 1];
+            log_message('error', 'Home controller error: ' . $e->getMessage());
+            $selectedYear = date('Y');
+            $monthlyEnrollmentData = array_fill(0, 12, 0);
+            $availableYears = [(int)date('Y')];
         }
         
+        // Get registration status
+        try {
+            $systemSettingModel = new \App\Models\SystemSettingModel();
+            $registrationSetting = $systemSettingModel->getSetting('registration_enabled', null);
+            if ($registrationSetting === null) {
+                $registrationSetting = $systemSettingModel->getSetting('enrollment_enabled', 1); // backward compatibility
+            }
+            $registrationEnabled = (bool) $registrationSetting;
+        } catch (\Throwable $e) {
+            $registrationEnabled = true;
+        }
+        
+        helper('landing');
+
         return view('landing', [
-            'title' => 'LPHS School Management System',
+            'title' => 'CSCS School Management System',
             'announcements' => $announcements,
             'enrollmentData' => json_encode($enrollmentData),
-            'predictionData' => json_encode($predictionData),
-            'monthlyEnrollmentData' => json_encode($monthlyEnrollmentData)
+            'monthlyEnrollmentData' => json_encode($monthlyEnrollmentData),
+            'selectedYear' => $selectedYear,
+            'availableYears' => $availableYears,
+            'registrationEnabled' => $registrationEnabled,
+            'heroSlides' => landing_hero_slides_for_view(),
+            'stripText' => landing_announcement_strip_text(),
         ]);
+    }
+    
+    private function getEnrollmentDataFromDB(): array
+    {
+        $db = \Config\Database::connect();
+        
+        // Get enrollment data by school year instead of calendar year
+        $enrollmentData = [];
+        $currentYear = get_current_school_year();
+        $years = explode('-', $currentYear);
+        $schoolYears = [];
+        for ($i = 4; $i >= 0; $i--) {
+            $y = $years[0] - $i;
+            $schoolYears[] = $y . '-' . ($y + 1);
+        }
+        
+        foreach ($schoolYears as $schoolYear) {
+            $yearlyTotal = $db->query("
+                SELECT COUNT(*) as count
+                FROM students 
+                WHERE school_year = ?
+                AND enrollment_status = 'enrolled'
+                AND deleted_at IS NULL
+            ", [$schoolYear])->getRow()->count ?? 0;
+            
+            // Get monthly distribution for this school year
+            $monthlyResults = $db->query("
+                SELECT 
+                    MONTH(created_at) as month,
+                    COUNT(*) as count
+                FROM students 
+                WHERE school_year = ?
+                AND enrollment_status = 'enrolled'
+                AND deleted_at IS NULL
+                GROUP BY MONTH(created_at)
+                ORDER BY MONTH(created_at)
+            ", [$schoolYear])->getResultArray();
+            
+            // Initialize monthly array with zeros
+            $monthly = array_fill(0, 12, 0);
+            
+            // Fill in actual counts from database
+            foreach ($monthlyResults as $result) {
+                if ($result['month'] >= 1 && $result['month'] <= 12) {
+                    $monthly[$result['month'] - 1] = (int)$result['count'];
+                }
+            }
+            
+            // Use the year part of school year for chart display
+            $displayYear = (int)substr($schoolYear, 0, 4) + 1; // 2021-2022 becomes 2022
+            
+            $enrollmentData[$displayYear] = [
+                'monthly' => $monthly, 
+                'yearly' => [(int)$yearlyTotal]
+            ];
+        }
+        
+        return $enrollmentData;
     }
     
     private function getEnrollmentData(): array
     {
-        $studentModel = new StudentModel();
-        
-        try {
-            // Get total enrolled students
-            $totalStudents = $studentModel->where('enrollment_status', 'enrolled')->countAllResults();
-            
-            // Simulate Philippine enrollment pattern based on actual data
-            $pattern = [3, 2, 1, 2, 4, 35, 28, 15, 6, 2, 1, 1]; // Percentages
-            
-            $data = [];
-            for ($year = 2023; $year <= 2025; $year++) {
-                $baseCount = $year == 2024 ? $totalStudents : round($totalStudents * 0.8);
-                $monthly = [];
-                
-                foreach ($pattern as $percent) {
-                    $monthly[] = round(($baseCount * $percent) / 100);
-                }
-                
-                $data[$year] = [
-                    'monthly' => $monthly,
-                    'yearly' => [array_sum($monthly)]
-                ];
-            }
-            
-            return $data;
-        } catch (\Throwable $e) {
-            // Fallback data
-            return [
-                2023 => ['monthly' => [3, 2, 1, 2, 4, 35, 28, 15, 6, 2, 1, 1], 'yearly' => [100]],
-                2024 => ['monthly' => [4, 3, 1, 3, 5, 47, 38, 20, 8, 3, 2, 1], 'yearly' => [135]],
-                2025 => ['monthly' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'yearly' => [0]]
-            ];
-        }
+        return $this->getEnrollmentDataFromDB();
     }
     
-    private function generatePredictions(array $historicalData): array
-    {
-        // Get current enrolled student data as baseline
-        $currentEnrolledData = $this->getMonthlyEnrollmentData();
-        $currentTotal = array_sum($currentEnrolledData);
-        
-        // Calculate growth rate based on current enrollment trends
-        $baseGrowthRate = 0.08; // 8% annual growth (typical for growing schools)
-        
-        $predictions = [];
-        
-        // Generate predictions for 2026-2028 based on current enrollment data
-        for ($year = 2026; $year <= 2028; $year++) {
-            $yearsFromNow = $year - 2025;
-            $growthFactor = pow(1 + $baseGrowthRate, $yearsFromNow);
-            
-            // Apply growth to each month's current enrollment
-            $monthlyPredictions = [];
-            foreach ($currentEnrolledData as $monthValue) {
-                $monthlyPredictions[] = round($monthValue * $growthFactor);
-            }
-            
-            $predictions[$year] = [
-                'monthly' => $monthlyPredictions,
-                'yearly' => [array_sum($monthlyPredictions)]
-            ];
-        }
-        
-        return $predictions;
-    }
-
     public function getEnrollmentApi(): ResponseInterface
     {
         try {
-            $enrollmentData = $this->getEnrollmentData();
-            $predictionData = $this->generatePredictions($enrollmentData);
+            $enrollmentData = $this->getEnrollmentDataFromDB();
             
             return $this->response->setJSON([
                 'success' => true,
-                'enrollment' => $enrollmentData,
-                'predictions' => $predictionData
+                'enrollment' => $enrollmentData
             ]);
         } catch (\Throwable $e) {
             return $this->response->setJSON([
@@ -149,61 +168,87 @@ class Home extends BaseController
     }
 
     /**
-     * Get monthly enrollment data for enrolled students chart
+     * Get monthly enrollment data for enrolled students chart (same as admin dashboard)
      */
-    private function getMonthlyEnrollmentData(): array
+    private function getMonthlyEnrollmentData($year = null): array
     {
         $db = \Config\Database::connect();
         
+        // Use current year if not specified
+        if ($year === null) {
+            $year = date('Y');
+        }
+        
         try {
-            // Get students enrolled before today (for scattering)
-            $oldStudents = $db->query("
-                SELECT COUNT(*) as count 
-                FROM students 
-                WHERE DATE(created_at) < CURDATE()
-                AND enrollment_status = 'enrolled'
-                AND deleted_at IS NULL
-            ")->getRow()->count ?? 0;
-            
-            // Get students enrolled today and onwards (real data)
-            $newStudents = $db->query("
+            // Get all enrolled students by month for specified year
+            $currentYearStudents = $db->query("
                 SELECT MONTH(created_at) as month, COUNT(*) as count 
                 FROM students 
-                WHERE DATE(created_at) >= CURDATE()
+                WHERE YEAR(created_at) = ?
                 AND enrollment_status = 'enrolled'
                 AND deleted_at IS NULL
                 GROUP BY MONTH(created_at)
-            ")->getResultArray();
+            ", [$year])->getResultArray();
             
-            // Philippine enrollment distribution pattern (Jan-Oct only, Nov-Dec = 0)
-            $distribution = [0.03, 0.02, 0.02, 0.07, 0.20, 0.45, 0.15, 0.04, 0.02, 0.00, 0.00, 0.00];
+            // Initialize monthly data array with zeros
+            $monthlyData = array_fill(0, 12, 0);
             
-            $monthlyData = [];
-            for ($month = 1; $month <= 12; $month++) {
-                if ($month <= 10) {
-                    // Scatter old data across Jan-Oct only
-                    $count = (int)round($oldStudents * $distribution[$month - 1]);
-                } else {
-                    // Nov-Dec start with 0 (no scattered data)
-                    $count = 0;
+            // Fill in actual enrollment counts from database
+            foreach ($currentYearStudents as $student) {
+                if ($student['month'] >= 1 && $student['month'] <= 12) {
+                    $monthlyData[$student['month'] - 1] = (int)$student['count'];
                 }
-                
-                // Add real new enrollments for this month
-                foreach ($newStudents as $newStudent) {
-                    if ($newStudent['month'] == $month) {
-                        $count += (int)$newStudent['count'];
-                    }
-                }
-                
-                $monthlyData[] = $count;
             }
             
             return $monthlyData;
         } catch (\Throwable $e) {
-            // Fallback data
-            return [5, 4, 1, 4, 7, 63, 51, 27, 11, 14, 3, 1];
+            log_message('error', "Error getting enrollment data for year {$year}: " . $e->getMessage());
+            return array_fill(0, 12, 0);
         }
     }
 
-    // About pages disabled per navigation cleanup
+    /**
+     * Get available years for enrollment data filtering
+     */
+    private function getAvailableYears(): array
+    {
+        $db = \Config\Database::connect();
+        
+        try {
+            $years = $db->query("
+                SELECT DISTINCT YEAR(created_at) as year 
+                FROM students 
+                WHERE deleted_at IS NULL 
+                AND created_at IS NOT NULL
+                ORDER BY year DESC
+            ")->getResultArray();
+            
+            $availableYears = [];
+            foreach ($years as $yearData) {
+                if ($yearData['year']) {
+                    $availableYears[] = (int)$yearData['year'];
+                }
+            }
+            
+            // Ensure current year is included
+            $currentYear = (int)date('Y');
+            if (!in_array($currentYear, $availableYears)) {
+                $availableYears[] = $currentYear;
+                sort($availableYears);
+                $availableYears = array_reverse($availableYears);
+            }
+            
+            return $availableYears;
+        } catch (\Throwable $e) {
+            // Fallback to current year
+            return [(int)date('Y')];
+        }
+    }
+
+    public function about(): ResponseInterface|string
+    {
+        return view('about', [
+            'title' => 'About — Cauayan South Central School',
+        ]);
+    }
 }

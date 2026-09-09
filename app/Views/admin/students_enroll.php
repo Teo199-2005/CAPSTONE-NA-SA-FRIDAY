@@ -4,7 +4,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3">Enroll New Student</h1>
   <div>
-    <button type="button" class="btn btn-info me-2" onclick="fillDemoData()">Demo Fill</button>
     <a href="<?= base_url('admin/students') ?>" class="btn btn-outline-secondary">Back to Students</a>
   </div>
 </div>
@@ -14,14 +13,14 @@
   
   <div class="card mb-4">
     <div class="card-header">
-      <h5 class="card-title mb-0">Account Information</h5>
+      <h5 class="card-title mb-0"><i class="bi bi-person-badge me-2"></i>Account Information</h5>
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-4">
           <div class="mb-3">
-            <label class="form-label">LRN</label>
-            <input type="text" class="form-control" name="lrn" placeholder="Auto-generated if empty">
+            <label class="form-label">LRN *</label>
+            <input type="text" class="form-control" name="lrn" required maxlength="12" pattern="[0-9]{12}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12)">
           </div>
         </div>
         <div class="col-md-4">
@@ -60,32 +59,40 @@
 
   <div class="card mb-4">
     <div class="card-header">
-      <h5 class="card-title mb-0">Personal Information</h5>
+      <h5 class="card-title mb-0"><i class="bi bi-person me-2"></i>Personal Information</h5>
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-3">
           <div class="mb-3">
             <label class="form-label">First Name *</label>
-            <input type="text" class="form-control" name="first_name" required>
+            <input type="text" class="form-control" name="first_name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
           </div>
         </div>
         <div class="col-md-3">
           <div class="mb-3">
             <label class="form-label">Middle Name</label>
-            <input type="text" class="form-control" name="middle_name">
+            <input type="text" class="form-control" name="middle_name" oninput="this.value = this.value.replace(/[0-9]/g, '')">
           </div>
         </div>
         <div class="col-md-3">
           <div class="mb-3">
             <label class="form-label">Last Name *</label>
-            <input type="text" class="form-control" name="last_name" required>
+            <input type="text" class="form-control" name="last_name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
           </div>
         </div>
         <div class="col-md-3">
           <div class="mb-3">
             <label class="form-label">Suffix</label>
-            <input type="text" class="form-control" name="suffix" placeholder="Jr., Sr., III">
+            <select class="form-select" name="suffix">
+              <option value="">None</option>
+              <option value="Jr.">Jr.</option>
+              <option value="Sr.">Sr.</option>
+              <option value="II">II</option>
+              <option value="III">III</option>
+              <option value="IV">IV</option>
+              <option value="V">V</option>
+            </select>
           </div>
         </div>
       </div>
@@ -129,7 +136,7 @@
         <div class="col-md-4">
           <div class="mb-3">
             <label class="form-label">Contact Number</label>
-            <input type="text" class="form-control" name="contact_number">
+            <input type="text" class="form-control" name="contact_number" oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')">
           </div>
         </div>
       </div>
@@ -138,22 +145,28 @@
 
   <div class="card mb-4">
     <div class="card-header">
-      <h5 class="card-title mb-0">Academic Information</h5>
+      <h5 class="card-title mb-0"><i class="bi bi-book me-2"></i>Academic Information</h5>
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-4">
           <div class="mb-3">
             <label class="form-label">Grade Level *</label>
-            <select class="form-select" name="grade_level" required>
+            <select class="form-select" name="grade_level" id="gradeLevel" required>
               <option value="">Select Grade</option>
-              <option value="7">Grade 7</option>
-              <option value="8">Grade 8</option>
-              <option value="9">Grade 9</option>
-              <option value="10">Grade 10</option>
-              <option value="11">Grade 11</option>
-              <option value="12">Grade 12</option>
+              <?php foreach (grade_level_options() as $g): ?>
+                <option value="<?= $g ?>"><?= esc(grade_level_label($g)) ?></option>
+              <?php endforeach; ?>
             </select>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label">Section</label>
+            <select class="form-select" name="section_id" id="sectionSelect">
+              <option value="">Select grade level first</option>
+            </select>
+            <div id="sectionCapacityInfo" class="form-text" style="display: none;"></div>
           </div>
         </div>
         <div class="col-md-4">
@@ -163,14 +176,7 @@
               <option value="">Select Type</option>
               <option value="New Student">New Student</option>
               <option value="Transferee">Transferee</option>
-            </select>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="mb-3">
-            <label class="form-label">Section</label>
-            <select class="form-select" name="section_id">
-              <option value="">No Section Assigned</option>
+              <option value="Old Student">Old Student</option>
             </select>
           </div>
         </div>
@@ -184,34 +190,35 @@
 
   <div class="card mb-4">
     <div class="card-header">
-      <h5 class="card-title mb-0">Required Documents</h5>
+      <h5 class="card-title mb-0"><i class="bi bi-file-earmark me-2"></i>Documents (Optional)</h5>
+      <small class="text-muted">Documents can be uploaded later if not available now</small>
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label">Birth Certificate *</label>
-            <input type="file" class="form-control" name="birth_certificate" accept=".pdf,.jpg,.jpeg,.png" required>
+            <label class="form-label">Birth Certificate</label>
+            <input type="file" class="form-control" name="birth_certificate" accept=".pdf,.jpg,.jpeg,.png">
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label">Report Card (Form 138) *</label>
-            <input type="file" class="form-control" name="report_card" accept=".pdf,.jpg,.jpeg,.png" required>
+            <label class="form-label">Report Card (Form 138)</label>
+            <input type="file" class="form-control" name="report_card" accept=".pdf,.jpg,.jpeg,.png">
           </div>
         </div>
       </div>
       <div class="row">
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label">Good Moral Certificate *</label>
-            <input type="file" class="form-control" name="good_moral" accept=".pdf,.jpg,.jpeg,.png" required>
+            <label class="form-label">Good Moral Certificate</label>
+            <input type="file" class="form-control" name="good_moral" accept=".pdf,.jpg,.jpeg,.png">
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label">2x2 Photo *</label>
-            <input type="file" class="form-control" name="photo" accept=".jpg,.jpeg,.png" required>
+            <label class="form-label">2x2 Photo</label>
+            <input type="file" class="form-control" name="photo" accept=".jpg,.jpeg,.png">
           </div>
         </div>
       </div>
@@ -220,20 +227,20 @@
 
   <div class="card mb-4">
     <div class="card-header">
-      <h5 class="card-title mb-0">Emergency Contact</h5>
+      <h5 class="card-title mb-0"><i class="bi bi-telephone me-2"></i>Emergency Contact</h5>
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label">Emergency Contact Name</label>
-            <input type="text" class="form-control" name="emergency_contact_name">
+            <input type="text" class="form-control" name="emergency_contact_name" oninput="this.value = this.value.replace(/[0-9]/g, '')">
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label">Emergency Contact Number</label>
-            <input type="text" class="form-control" name="emergency_contact_number">
+            <input type="text" class="form-control" name="emergency_contact_number" oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')">
           </div>
         </div>
       </div>
@@ -300,98 +307,97 @@ document.getElementById('confirm_password').addEventListener('input', function()
   }
 });
 
-// Demo fill function
-function fillDemoData() {
-  const firstNames = ['Juan', 'Maria', 'Jose', 'Ana', 'Carlos', 'Sofia', 'Miguel', 'Isabella', 'Luis', 'Carmen'];
-  const middleNames = ['Santos', 'Cruz', 'Reyes', 'Garcia', 'Lopez', 'Martinez', 'Gonzalez', 'Rodriguez'];
-  const lastNames = ['Dela Cruz', 'Santos', 'Garcia', 'Reyes', 'Lopez', 'Martinez', 'Gonzalez', 'Rodriguez'];
-  const genders = ['Male', 'Female'];
-  const gradeLevels = ['7', '8', '9', '10', '11', '12'];
-  const studentTypes = ['New Student', 'Transferee'];
-  const places = ['Tagbilaran City, Bohol', 'Panglao, Bohol', 'Dauis, Bohol', 'Baclayon, Bohol'];
-  const religions = ['Catholic', 'Protestant', 'Iglesia ni Cristo', 'Baptist'];
-  const relationships = ['Mother', 'Father', 'Guardian', 'Aunt', 'Uncle'];
-  
-  const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const getRandomBirthDate = () => {
-    const today = new Date();
-    const age = Math.floor(Math.random() * 7) + 11;
-    const birthYear = today.getFullYear() - age;
-    const birthMonth = Math.floor(Math.random() * 12) + 1;
-    const birthDay = Math.floor(Math.random() * 28) + 1;
-    return `${birthYear}-${birthMonth.toString().padStart(2, '0')}-${birthDay.toString().padStart(2, '0')}`;
-  };
-  const getRandomPhone = () => {
-    const prefixes = ['0917', '0918', '0919', '0920', '0921'];
-    return getRandom(prefixes) + Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
-  };
-  
-  const firstName = getRandom(firstNames);
-  const lastName = getRandom(lastNames);
-  const email = (firstName + lastName).toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 999) + '@gmail.com';
-  
-  document.querySelector('[name="lrn"]').value = '999' + Date.now().toString().slice(-9);
-  document.querySelector('[name="email"]').value = email;
-  document.querySelector('[name="password"]').value = 'Demo123!';
-  document.querySelector('[name="confirm_password"]').value = 'Demo123!';
-  document.querySelector('[name="first_name"]').value = firstName;
-  document.querySelector('[name="middle_name"]').value = getRandom(middleNames);
-  document.querySelector('[name="last_name"]').value = lastName;
-  document.querySelector('[name="gender"]').value = getRandom(genders);
-  document.querySelector('[name="date_of_birth"]').value = getRandomBirthDate();
-  document.querySelector('[name="place_of_birth"]').value = getRandom(places);
-  document.querySelector('[name="nationality"]').value = 'Filipino';
-  document.querySelector('[name="religion"]').value = getRandom(religions);
-  document.querySelector('[name="contact_number"]').value = getRandomPhone();
-  document.querySelector('[name="grade_level"]').value = getRandom(gradeLevels);
-  document.querySelector('[name="student_type"]').value = getRandom(studentTypes);
-  document.querySelector('[name="address"]').value = `Purok ${Math.floor(Math.random() * 10) + 1}, Barangay Poblacion, Panglao, Bohol`;
-  document.querySelector('[name="emergency_contact_name"]').value = getRandom(firstNames) + ' ' + getRandom(lastNames);
-  document.querySelector('[name="emergency_contact_number"]').value = getRandomPhone();
-  document.querySelector('[name="emergency_contact_relationship"]').value = getRandom(relationships);
-}
 
-// Form submission
-document.getElementById('enrollStudentForm').addEventListener('submit', function(e) {
-  e.preventDefault();
+
+// Grade level change - filter sections with capacity info
+const allSections = <?= json_encode($sections ?? []) ?>;
+document.getElementById('gradeLevel').addEventListener('change', function() {
+  const gradeLevel = this.value;
+  const sectionSelect = document.getElementById('sectionSelect');
+  const capacityInfo = document.getElementById('sectionCapacityInfo');
   
-  const formData = new FormData(this);
+  sectionSelect.innerHTML = '<option value="">No Section Assigned</option>';
+  capacityInfo.style.display = 'none';
   
-  fetch(this.action, {
-    method: 'POST',
-    body: formData
-  })
-  .then(response => {
-    if (!response.ok) {
-      return response.text().then(text => {
-        throw new Error(`HTTP ${response.status}: ${text}`);
+  if (gradeLevel) {
+    // Fetch sections with enrollment counts
+    fetch(`<?= base_url('admin/sections/grade-sections/') ?>${gradeLevel}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          data.sections.forEach(section => {
+            const option = document.createElement('option');
+            option.value = section.id;
+            const capacity = section.max_capacity || 40;
+            const enrollment = section.current_enrollment || 0;
+            const status = enrollment >= capacity ? ' (FULL)' : ` (${enrollment}/${capacity})`;
+            option.textContent = section.section_name + status;
+            option.disabled = enrollment >= capacity;
+            sectionSelect.appendChild(option);
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching sections:', error);
+        // Fallback to original method
+        const filteredSections = allSections.filter(s => s.grade_level == gradeLevel);
+        filteredSections.forEach(section => {
+          const option = document.createElement('option');
+          option.value = section.id;
+          option.textContent = section.section_name;
+          sectionSelect.appendChild(option);
+        });
       });
-    }
-    return response.text();
-  })
-  .then(text => {
-    if (text.includes('<!doctype html>') || text.includes('<html')) {
-      alert('Student enrolled successfully!');
-      window.location.href = '<?= base_url('admin/students') ?>';
-      return;
-    }
-    
-    try {
-      const data = JSON.parse(text);
-      if (data.success) {
-        alert('Student enrolled successfully!');
-        window.location.href = '<?= base_url('admin/students') ?>';
-      } else {
-        alert('Error: ' + (data.error || data.message || 'Failed to enroll student'));
-      }
-    } catch (e) {
-      alert('Error: Unable to process server response');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    alert('Network Error: ' + error.message);
-  });
+  }
+});
+
+// Section selection - show capacity info
+document.getElementById('sectionSelect').addEventListener('change', function() {
+  const sectionId = this.value;
+  const capacityInfo = document.getElementById('sectionCapacityInfo');
+  
+  if (sectionId) {
+    fetch(`<?= base_url('admin/sections/capacity-info/') ?>${sectionId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const capacity = data.section.max_capacity || 40;
+          const enrollment = data.section.current_enrollment || 0;
+          
+          if (enrollment >= capacity) {
+            capacityInfo.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> This section is at full capacity (${enrollment}/${capacity})</span>`;
+            capacityInfo.className = 'form-text text-danger';
+          } else {
+            capacityInfo.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Available slots: ${capacity - enrollment} (${enrollment}/${capacity})</span>`;
+            capacityInfo.className = 'form-text text-success';
+          }
+          capacityInfo.style.display = 'block';
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching capacity info:', error);
+        capacityInfo.style.display = 'none';
+      });
+  } else {
+    capacityInfo.style.display = 'none';
+  }
+});
+
+// Form submission with capacity validation
+document.getElementById('enrollStudentForm').addEventListener('submit', function(e) {
+  const sectionSelect = document.getElementById('sectionSelect');
+  const selectedOption = sectionSelect.options[sectionSelect.selectedIndex];
+  
+  if (selectedOption && selectedOption.disabled) {
+    e.preventDefault();
+    alert('Cannot enroll in a full section. Please select a different section.');
+    return false;
+  }
+  
+  const submitBtn = this.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Enrolling...';
+  return true;
 });
 </script>
 

@@ -34,6 +34,12 @@
 
 <div class="card border-0 shadow-sm">
   <div class="card-body">
+    <?php if (session()->getFlashdata('success')): ?>
+      <div class="alert alert-success"><?= esc(session()->getFlashdata('success')) ?></div>
+    <?php endif; ?>
+    <?php if (session()->getFlashdata('error')): ?>
+      <div class="alert alert-danger"><?= esc(session()->getFlashdata('error')) ?></div>
+    <?php endif; ?>
     <?php if (empty($users)): ?>
       <p class="text-muted mb-0">No users found.</p>
     <?php else: ?>
@@ -73,6 +79,9 @@
               <td><?= esc($u['created_at']) ?></td>
               <td>
                 <a href="<?= base_url('admin/users/edit/' . $u['id']) ?>" class="btn btn-sm btn-outline-primary me-1" title="Edit User"><i class="bi bi-pencil"></i></a>
+                <?php if (! empty($isMasterAdmin) && ($u['user_role'] ?? '') === 'Admin staff'): ?>
+                  <a href="<?= base_url('admin/users/staff-permissions/' . $u['id']) ?>" class="btn btn-sm btn-outline-secondary me-1" title="Page access"><i class="bi bi-ui-checks"></i></a>
+                <?php endif; ?>
                 <?php if ($u['user_role'] === 'student' && !$u['section_assigned']): ?>
                   <a href="<?= base_url('admin/students') ?>" class="btn btn-sm btn-outline-warning me-1" title="Assign Section"><i class="bi bi-person-plus"></i></a>
                 <?php endif; ?>
@@ -87,6 +96,8 @@
   </div>
 </div>
 
+
+
 <script>
 function buildAddUserModal() {
   const existing = document.getElementById('addUserModal');
@@ -95,7 +106,7 @@ function buildAddUserModal() {
   <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Add User</h5>
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add User</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="<?= base_url('admin/users/create') ?>">
@@ -114,7 +125,7 @@ function buildAddUserModal() {
             <label class="form-label">Role</label>
             <select name="role" class="form-select" required>
               <option value="">Select Role</option>
-              <option value="admin">Admin</option>
+              <option value="admin">Master admin</option>
               <option value="teacher">Teacher</option>
               <option value="student">Student</option>
               <option value="parent">Parent</option>
@@ -140,10 +151,3 @@ function openAddUserModal() {
 
 
 <?= $this->endSection() ?>
-
-
-</script>
-
-
-
-

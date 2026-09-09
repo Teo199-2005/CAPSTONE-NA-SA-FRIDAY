@@ -7,7 +7,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="bi bi-person-badge text-primary"></i> 
+                        <i class="bi bi-person-badge dash-icon-inline"></i> 
                         Teacher Details
                     </h5>
                     <div>

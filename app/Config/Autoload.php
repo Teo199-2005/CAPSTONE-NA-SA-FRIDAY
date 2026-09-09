@@ -1,5 +1,4 @@
 <?php
-
 namespace Config;
 
 use CodeIgniter\Config\AutoloadConfig;
@@ -88,5 +87,5 @@ class Autoload extends AutoloadConfig
      *
      * @var list<string>
      */
-    public $helpers = ['url', 'form', 'setting', 'auth'];
+    public $helpers = ['url', 'form', 'setting', 'auth', 'school_year', 'grade_level', 'student_form', 'teacher_form', 'admin_access', 'pdf_logo', 'asset', 'landing', 'materials', 'platform_rating', 'portal_nav', 'sned'];
 }

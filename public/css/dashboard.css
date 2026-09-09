@@ -1,5 +1,19 @@
 /* Dashboard Sidebar - Scoped Styles (no impact on landing page) */
 
+/* Shared layout tokens (sidebar + main content are siblings) */
+body.dashboard-app {
+  --sb-width: 264px; /* slightly narrower to fit more items */
+  --sb-width-collapsed: 68px;
+}
+
+@media (min-width: 1200px) {
+  body.dashboard-app { --sb-width: 296px; }
+}
+
+@media (min-width: 1400px) {
+  body.dashboard-app { --sb-width: 304px; }
+}
+
 /* Color tokens for the sidebar scope */
 .app-sidebar-wrapper {
   --sb-bg-start: #0D1B2A;
@@ -17,7 +31,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 260px;
+  width: var(--sb-width);
   height: 100vh;
   background: linear-gradient(180deg, var(--sb-bg-start) 0%, var(--sb-bg-end) 100%);
   border-right: 3px solid #1e40af;
@@ -26,28 +40,49 @@
   transition: width 0.3s ease, transform 0.3s ease;
 }
 
-/* Sidebar body */
+/* Sidebar body — fit viewport without scrolling */
 .app-sidebar {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding: 2px 0 4px;
+}
+
+.app-sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 8px 0;
+  padding-bottom: 6px;
   scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.app-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
 }
 
 /* Top/Header */
 .app-sidebar-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 20px 16px;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  flex-shrink: 0;
 }
 
 .app-brand-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   background: var(--sb-active);
   display: grid;
   place-items: center;
@@ -56,8 +91,8 @@
 }
 
 .app-brand-logo img {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
 }
@@ -69,18 +104,47 @@
 
 .app-brand-title {
   color: var(--sb-text-strong);
-  font-family: 'Times New Roman', Times, serif !important;
+  font-family: inherit;
   font-weight: 700;
-  line-height: 1.2;
-  font-size: 1.1rem;
+  line-height: 1.15;
+  font-size: 0.98rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .app-brand-subtitle {
   color: var(--sb-text);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   opacity: 0.9;
   line-height: 1.2;
+}
+
+/* Compact user greeting */
+.user-greeting {
+  padding: 6px 8px 6px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.22) 0%, rgba(75, 85, 99, 0.22) 50%, rgba(107, 114, 128, 0.22) 100%);
+  border-bottom: 1px solid rgba(55, 65, 81, 0.28);
+}
+
+.greeting-text { text-align: center; }
+
+.greeting-main {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 2px;
+}
+
+.greeting-name {
+  font-size: 0.9rem;
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Toggle (used for mobile or desktop collapse) */
@@ -103,20 +167,43 @@
 }
 
 /* Section Title */
-.app-sidebar-section-title {
-  color: var(--sb-text-muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin: 18px 0 10px;
-  padding: 0 16px;
+  .app-sidebar-section-title {
+    color: var(--sb-text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 12px 0 6px;
+    padding: 0 10px;
+    line-height: 1.15;
+}
+
+.app-sidebar-nav > .app-sidebar-section-title:first-child {
+  margin-top: 4px;
+}
+
+.app-sidebar-nav > .app-sidebar-divider {
+  margin-top: 12px;
 }
 
 /* Divider line between groups */
 .app-sidebar-divider {
   height: 1px;
   background: var(--sb-border);
-  margin: 12px 16px;
+  margin: 8px 10px 4px;
+  flex-shrink: 0;
+}
+
+/* Short laptop screens — slight tighten only (keep readable tap targets) */
+@media (max-height: 760px) {
+  .app-sidebar-header { padding: 8px 10px 6px; }
+  .user-greeting { padding: 6px 10px 8px; margin-bottom: 4px; }
+  .app-sidebar-section-title { margin: 8px 0 4px; }
+  .app-sidebar-link {
+    padding: 10px 12px;
+    min-height: 44px;
+    font-size: 0.9375rem;
+  }
 }
 
 /* Menu */
@@ -124,21 +211,47 @@
   list-style: none;
   margin: 0;
   padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.app-sidebar-menu li { margin: 0; }
+.app-sidebar-menu li {
+  margin: 0;
+  width: 100%;
+}
 
 .app-sidebar-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  min-height: 40px;
   border-radius: 8px;
   color: var(--sb-text);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
   border: 1px solid transparent;
-  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  flex-wrap: nowrap;
+  position: relative;
+}
+
+/* Keep long labels + count badge on one row */
+.app-sidebar-link .app-sidebar-link-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.app-sidebar-link .app-sidebar-badge {
+  flex-shrink: 0;
 }
 
 .app-sidebar-link:hover {
@@ -150,13 +263,19 @@
 }
 
 .app-sidebar-link i {
-  width: 24px;
-  height: 24px;
-  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  font-size: 1.05rem;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   color: var(--sb-text);
-  transition: transform 0.2s ease, color 0.2s ease;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.app-sidebar-link .app-sidebar-badge {
+  font-size: 0.65rem;
+  padding: 0.2em 0.4em;
 }
 
 .app-sidebar-link:hover i {
@@ -167,8 +286,18 @@
 .app-sidebar-link.active {
   background: var(--sb-active);
   color: var(--sb-text-strong);
-  box-shadow: 0 0 12px rgba(37, 99, 235, 0.6);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.45);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.app-sidebar-menu-account {
+  margin-bottom: 8px;
+}
+
+.app-sidebar-link-logout:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fecaca;
 }
 
 .app-sidebar-link.active i { color: var(--sb-text-strong); }
@@ -215,15 +344,28 @@
 }
 
 /* Collapsed (desktop) – icons only + tooltip on hover */
-.app-sidebar-wrapper.collapsed { width: 80px; }
+.app-sidebar-wrapper.collapsed { width: var(--sb-width-collapsed); }
 
 .app-sidebar-wrapper.collapsed .app-brand-text,
+.app-sidebar-wrapper.collapsed .user-greeting,
 .app-sidebar-wrapper.collapsed .app-sidebar-section-title,
-.app-sidebar-wrapper.collapsed .app-sidebar-link span { display: none; }
+.app-sidebar-wrapper.collapsed .app-sidebar-divider,
+.app-sidebar-wrapper.collapsed .app-sidebar-link .app-sidebar-link-text,
+.app-sidebar-wrapper.collapsed .app-sidebar-link .app-sidebar-badge { display: none !important; }
+
+.app-sidebar-wrapper.collapsed .app-sidebar-header {
+  justify-content: center;
+  padding: 10px 6px;
+}
+
+.app-sidebar-wrapper.collapsed .app-sidebar-menu {
+  padding: 0 4px;
+}
 
 .app-sidebar-wrapper.collapsed .app-sidebar-link {
   justify-content: center;
-  padding: 12px;
+  padding: 10px 6px;
+  min-height: 40px;
 }
 
 /* Simple tooltip using data-label */
@@ -246,19 +388,33 @@
 }
 
 /* Main Content Area */
-.main-content {
-  margin-left: 260px;
+body.dashboard-app .main-content {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   transition: margin-left 0.3s ease;
   background: #f8fafc;
-  border-left: 2px solid #e2e8f0;
   position: relative;
+}
+
+@media (min-width: 992px) {
+  body.dashboard-app .main-content {
+    margin-left: var(--sb-width);
+    border-left: 2px solid #e2e8f0;
+  }
 }
 
 .page-content {
   flex: 1;
+}
+
+.dashboard-page-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 
@@ -270,27 +426,97 @@
 }
 
 @media (max-width: 991.98px) {
-  .main-content {
-    margin-left: 0;
+  body.dashboard-app .main-content,
+  body.dashboard-app .app-sidebar-wrapper.collapsed ~ .main-content,
+  body.dashboard-app .app-sidebar-wrapper.show ~ .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    border-left: none !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dashboard-app .main-content .page-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dashboard-app .main-content .page-content > .container-fluid,
+  body.dashboard-app .main-content .page-content > .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
+    border-radius: 0 !important;
+  }
+
+  body.dashboard-app .main-content footer,
+  body.dashboard-app .main-content > div[style*="linear-gradient"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dashboard-app .modern-footer {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  /* Override desktop card margins so the white panel spans the screen */
+  body.dashboard-app .main-content .container,
+  body.dashboard-app .main-content .container-fluid,
+  body.dashboard-app .main-content > .container,
+  body.dashboard-app .main-content > .container-fluid,
+  body.dashboard-app .dashboard-page-container {
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
   }
 }
 
-.app-sidebar-wrapper.collapsed ~ .main-content {
-  margin-left: 80px;
+@media (min-width: 992px) {
+  body.dashboard-app .app-sidebar-wrapper.collapsed ~ .main-content {
+    margin-left: var(--sb-width-collapsed);
+  }
 }
 
 /* Modern Footer Styles */
 .modern-footer {
   background: #2c3e50;
   color: #ecf0f1;
-  width: 100vw;
-  margin-left: -260px;
-  padding-left: 260px;
+  width: 100%;
+  margin-left: 0;
+  padding-left: 0;
   margin-top: auto;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
   flex-shrink: 0;
   z-index: 1040;
   position: relative;
+}
+
+@media (min-width: 992px) {
+  .modern-footer {
+    width: 100vw;
+    margin-left: calc(-1 * var(--sb-width));
+    padding-left: var(--sb-width);
+  }
+
+  body.dashboard-app .app-sidebar-wrapper.collapsed ~ .main-content .modern-footer {
+    margin-left: calc(-1 * var(--sb-width-collapsed));
+    padding-left: var(--sb-width-collapsed);
+  }
 }
 
 .footer-content {
@@ -423,10 +649,9 @@
   font-weight: 500;
 }
 
-/* Make LPHS SMS text white and Times New Roman in copyright */
 .footer-bottom-left p {
   color: #ffffff !important;
-  font-family: 'Times New Roman', Times, serif !important;
+  font-family: inherit;
   font-weight: 600 !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -490,6 +715,41 @@
   .social-links {
     justify-content: center;
   }
+}
+
+/* Teacher Dashboard */
+.teacher-dashboard-home {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.teacher-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.teacher-bottom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
+}
+
+.teacher-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.teacher-bottom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-top: 1.5rem;
 }
 
 /* Analytics page scoped styles */
@@ -653,6 +913,85 @@
 @media (max-width: 1199.98px) { .analytics-layout { grid-template-columns: 1fr 280px; } }
 @media (max-width: 991.98px) { .analytics-layout { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
 
+/* ---------------------------------------------------------------------------
+   Icon system: stat tiles, widgets (scoped to dashboard app)
+   Neutral surface + slate glyph; muted accents — no bright blue washes
+   --------------------------------------------------------------------------- */
+.dashboard-app .dash-icon-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.04);
+  color: #334155;
+}
+
+.dashboard-app .dash-icon-tile i {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+/* Muted semantic accents (icon color + very light tint) */
+.dashboard-app .dash-icon-tile--slate {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.dashboard-app .dash-icon-tile--emerald {
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #047857;
+  border-color: rgba(5, 150, 105, 0.22);
+}
+
+.dashboard-app .dash-icon-tile--amber {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.dashboard-app .dash-icon-tile--violet {
+  background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
+  color: #5b21b6;
+  border-color: rgba(109, 40, 217, 0.2);
+}
+
+.dashboard-app .dash-icon-tile--cyan {
+  background: linear-gradient(180deg, #ecfeff 0%, #cffafe 100%);
+  color: #0e7490;
+  border-color: rgba(14, 116, 144, 0.22);
+}
+
+/* Page header decorative icon (no tile) */
+.dashboard-app .dash-page-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.dashboard-app .dash-page-icon i {
+  font-size: inherit;
+}
+
+/* Inline list/card icons — neutral slate (not Bootstrap primary blue) */
+.dashboard-app .dash-icon-inline {
+  color: #475569;
+}
+
+/* Preserve button/link intent: icons inside colored buttons inherit */
+.dashboard-app .btn > i.bi,
+.dashboard-app a.btn > i.bi {
+  color: inherit;
+}
+
 /* KPI Tiles */
 .kpi-card {
   background: #ffffff;
@@ -674,14 +1013,37 @@
 .kpi-card .kpi-label { color: #64748b; font-size: 0.9rem; margin-bottom: 2px; }
 .kpi-card .kpi-value { color: #0f172a; font-size: 1.6rem; font-weight: 800; line-height: 1; }
 .kpi-card .kpi-icon {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: grid; place-items: center; font-size: 1.25rem; color: #1e40af;
-  background: rgba(30, 64, 175, 0.1);
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  color: #334155;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-.kpi-card.kpi-primary .kpi-icon { color: #1e40af; background: rgba(30, 64, 175, 0.12); }
-.kpi-card.kpi-warning .kpi-icon { color: #b45309; background: rgba(245, 158, 11, 0.15); }
-.kpi-card.kpi-success .kpi-icon { color: #047857; background: rgba(5, 150, 105, 0.15); }
-.kpi-card.kpi-info .kpi-icon { color: #0369a1; background: rgba(3, 105, 161, 0.15); }
+.kpi-card.kpi-primary .kpi-icon {
+  color: #475569;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #e2e8f0;
+}
+.kpi-card.kpi-warning .kpi-icon {
+  color: #b45309;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.kpi-card.kpi-success .kpi-icon {
+  color: #047857;
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: rgba(5, 150, 105, 0.22);
+}
+.kpi-card.kpi-info .kpi-icon {
+  color: #0e7490;
+  background: linear-gradient(180deg, #ecfeff 0%, #cffafe 100%);
+  border-color: rgba(14, 116, 144, 0.22);
+}
 
 /* KPI row width adjustment */
 @media (min-width: 768px) {
@@ -691,10 +1053,116 @@
   }
 }
 
-/* Top bar title styling */
-.top-bar-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
-.top-bar-title .title-main { color: #0f172a; }
-.top-bar-title .title-sub { color: #64748b; font-weight: 600; }
+/* Top bar: stay visible while scrolling, refined look */
+.dashboard-app .top-bar {
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: 0;
+  z-index: 1045;
+  background: #ffffff;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 0.875rem 1.5rem;
+}
+
+.dashboard-app .top-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1e40af 0%, #3b82f6 50%, #f59e0b 100%);
+  opacity: 0.35;
+}
+
+/* Top bar title: "Student Dashboard" prominent, "CSCS SMS" as subtitle */
+.top-bar-title-wrap {
+  margin-left: 0.25rem;
+}
+
+.top-bar-title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.125rem 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-family: inherit;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.top-bar-title .title-main {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.top-bar-title .title-sub {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.95em;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+/* Top bar icon buttons: notification bell + profile (unified style) */
+.top-bar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  text-decoration: none;
+}
+
+.top-bar-icon-btn i {
+  font-size: 1.35rem;
+}
+
+.top-bar-icon-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.top-bar-notification-bell:focus,
+.top-bar-profile-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.35);
+}
+
+/* Notification badge on bell */
+.top-bar-notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
 
 /* Enhanced Card and Container Visibility */
 .card {
@@ -746,24 +1214,17 @@
   background-color: #eff6ff !important;
 }
 
-/* Container and section separators */
-.container, .container-fluid {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-/* Page content wrapper */
-.main-content .container,
-.main-content .container-fluid {
-  margin: 1rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+/* Container cards — desktop dashboard pages only */
+@media (min-width: 992px) {
+  body.dashboard-app .main-content .container,
+  body.dashboard-app .main-content .container-fluid,
+  body.dashboard-app .dashboard-page-container {
+    margin: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
 }
 
 /* Section dividers */
@@ -904,16 +1365,236 @@
   background-color: #f9fafb !important;
 }
 
-/* Dashboard page content wrapper */
-.dashboard-app .main-content {
-  background: #f1f5f9;
-  min-height: 100vh;
-  box-shadow: inset 2px 0 8px rgba(0, 0, 0, 0.06);
-  border-left: 3px solid #e2e8f0;
+/* Dashboard shell — desktop sidebar gutter */
+@media (min-width: 992px) {
+  .dashboard-app .main-content {
+    background-color: #ffffff;
+    background-image: url("https://www.transparenttextures.com/patterns/dark-matter.png");
+    box-shadow: inset 2px 0 8px rgba(0, 0, 0, 0.06);
+    border-left: 3px solid #e2e8f0;
+  }
 }
 
-/* Page headers enhancement */
-.main-content h1, .main-content h2, .main-content h3 {
+@media (max-width: 991.98px) {
+  .dashboard-app .main-content {
+    background-color: #f1f5f9;
+    background-image: none;
+    box-shadow: none;
+    border-left: none;
+  }
+}
+
+/* Dashboard footer (structure — colors in scoped block below) */
+.dashboard-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+  box-sizing: border-box;
+}
+
+.dashboard-footer-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .dashboard-footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .dashboard-footer-aside {
+    text-align: left;
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .dashboard-footer-copy {
+    text-align: left;
+    margin: 0;
+  }
+}
+
+.dashboard-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard-footer-brand img {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.dashboard-footer-brand-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fbbf24;
+  line-height: 1.2;
+}
+
+.dashboard-footer-brand-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+}
+
+.dashboard-footer-contact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.dashboard-footer-contact a,
+.dashboard-footer-contact span {
+  color: #e2e8f0;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.dashboard-footer-contact a:hover {
+  color: #fff;
+}
+
+.dashboard-footer-contact i {
+  color: #fbbf24;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.dashboard-footer-aside {
+  text-align: right;
+}
+
+.dashboard-footer-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #1877f2;
+  border-radius: 8px;
+  color: #fff;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-footer-copy {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #ffffff;
+  line-height: 1.4;
+}
+
+/* Dashboard footer — mobile compact / desktop grid */
+body.dashboard-app footer.dashboard-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+body.dashboard-app .dashboard-footer-bar {
+  height: 3px;
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%);
+}
+
+body.dashboard-app .dashboard-footer-mobile {
+  display: none;
+}
+
+body.dashboard-app .dashboard-footer-inner--desktop {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  body.dashboard-app footer.dashboard-footer {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #ffffff;
+  }
+
+  body.dashboard-app .dashboard-footer-inner--desktop {
+    display: none !important;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile-brand img {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    object-fit: contain;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile-brand span {
+    font-weight: 600;
+    color: #fbbf24;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile-meta {
+    margin: 0;
+    text-align: right;
+    color: #ffffff;
+    flex-shrink: 0;
+  }
+}
+
+@media (min-width: 992px) {
+  body.dashboard-app footer.dashboard-footer {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+    color: #ffffff;
+  }
+
+  body.dashboard-app .dashboard-footer-copy {
+    color: #ffffff;
+  }
+
+  body.dashboard-app .dashboard-footer-mobile {
+    display: none !important;
+  }
+
+  body.dashboard-app .dashboard-footer-inner--desktop {
+    display: block !important;
+  }
+}
+
+/* Page headers enhancement (page body only — not top bar title) */
+.main-content .page-content h1,
+.main-content .page-content h2,
+.main-content .page-content h3 {
   color: #1e293b !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
   margin-bottom: 1.5rem !important;
@@ -921,28 +1602,30 @@
   border-bottom: 2px solid #e2e8f0 !important;
 }
 
-/* Content sections */
-.main-content > .container,
-.main-content > .container-fluid {
-  background: #ffffff;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  margin: 1rem;
-  padding: 2rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  position: relative;
-}
+/* Direct child containers (legacy) — desktop only */
+@media (min-width: 992px) {
+  body.dashboard-app .main-content > .container,
+  body.dashboard-app .main-content > .container-fluid {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    margin: 1rem;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    position: relative;
+  }
 
-.main-content > .container::before,
-.main-content > .container-fluid::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #3b82f6 0%, #1e40af 50%, #3b82f6 100%);
-  border-radius: 12px 12px 0 0;
+  body.dashboard-app .main-content > .container::before,
+  body.dashboard-app .main-content > .container-fluid::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6 0%, #1e40af 50%, #3b82f6 100%);
+    border-radius: 12px 12px 0 0;
+  }
 }
 
 /* Section spacing and separation */
@@ -961,6 +1644,37 @@
 .main-content .row .col-md-6 .card {
   height: 100%;
   margin-bottom: 1rem;
+}
+
+/*
+ * Admin /sections: summary KPIs — CSS Grid keeps four tiles on one row on desktop.
+ * Bootstrap .row + .col-* was wrapping 3+1 when gutters / min-content interacted with flex.
+ */
+.dashboard-app .sections-summary-stats {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  --bs-gutter-x: 0;
+  --bs-gutter-y: 0;
+  text-align: center;
+  align-items: center;
+}
+
+.dashboard-app .sections-summary-stats > [class*="col-"] {
+  width: 100% !important;
+  max-width: none !important;
+  flex: none !important;
+  min-width: 0;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+@media (max-width: 991.98px) {
+  .dashboard-app .sections-summary-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Enhanced visibility for small elements */
@@ -999,40 +1713,54 @@
 .badge.bg-secondary { background: linear-gradient(135deg, #6b7280, #4b5563) !important; }
 .badge.bg-info { background: linear-gradient(135deg, #0ea5e9, #0369a1) !important; }
 
-/* Global LPHS SMS branding font */
-*:contains("LPHS SMS"),
+/* Brand titles in dashboard chrome — inherit Inter stack from .dashboard-app */
 .app-brand-title,
 .footer-brand h3,
 .footer-bottom-left p,
-[title*="LPHS SMS"],
 .navbar-brand {
-  font-family: 'Times New Roman', Times, serif !important;
+  font-family: inherit;
 }
 
-/* Ensure LPHS SMS text is always white in footer areas */
 .footer-brand h3,
 .footer-bottom-left p {
   color: #ffffff !important;
-  font-family: 'Times New Roman', Times, serif !important;
   font-weight: 700 !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Modal z-index fixes for dashboard */
-.modal {
-  z-index: 1060 !important;
+/* Modal stacking — portal sits outside .main-content (z-index: 1) */
+body.dashboard-app .modal-backdrop {
+  z-index: 2147483000 !important;
 }
 
-.modal-backdrop {
-  z-index: 1055 !important;
+#dashboard-modal-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  pointer-events: none;
 }
 
-.modal.show {
-  z-index: 1060 !important;
+#dashboard-modal-portal > .modal {
+  z-index: 2147483001 !important;
+  pointer-events: auto;
 }
 
-.modal-dialog {
-  z-index: 1061 !important;
+#dashboard-modal-portal .modal.show {
+  z-index: 2147483001 !important;
+}
+
+#dashboard-modal-portal .modal-dialog {
+  z-index: 2147483002 !important;
+  margin-top: 1.75rem;
+  margin-bottom: 1.75rem;
+}
+
+#dashboard-modal-portal .modal-dialog-centered {
+  min-height: calc(100% - 3.5rem);
+}
+
+body.modal-open .dashboard-app .top-bar {
+  z-index: 1045 !important;
 }
 
 /* ====== FOOTER BASE ====== */
@@ -1068,6 +1796,79 @@ body.modal-open .app-sidebar-backdrop {
   z-index: 1;
 }
 
+/* ========== Mobile dashboard shell (authoritative — keep last in file) ========== */
+@media (max-width: 991.98px) {
+  body.dashboard-app {
+    overflow-x: hidden;
+  }
+
+  body.dashboard-app .app-sidebar-wrapper {
+    transform: translateX(-100%);
+  }
+
+  body.dashboard-app .app-sidebar-wrapper.show {
+    transform: translateX(0);
+  }
+
+  body.dashboard-app .main-content,
+  body.dashboard-app .app-sidebar-wrapper.collapsed ~ .main-content,
+  body.dashboard-app .app-sidebar-wrapper.show ~ .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    border-left: none !important;
+    box-sizing: border-box !important;
+    float: none !important;
+  }
+
+  body.dashboard-app .main-content > .top-bar,
+  body.dashboard-app .main-content > .page-content,
+  body.dashboard-app .main-content > footer.dashboard-footer {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dashboard-app .page-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.dashboard-app .dashboard-page-container,
+  body.dashboard-app .page-content > .dashboard-page-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1rem !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dashboard-app .dashboard-page-container::before {
+    display: none !important;
+  }
+
+  body.dashboard-app .main-content .container,
+  body.dashboard-app .main-content .container-fluid {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
 /* Ensure sidebar doesn't interfere with modals */
 .app-sidebar-wrapper {
   z-index: 1030 !important;
@@ -1091,4 +1892,267 @@ body.modal-open .app-sidebar-backdrop {
   background: #f8fafc !important;
   border-top: 2px solid #e5e7eb !important;
   border-radius: 0 0 12px 12px !important;
+}
+
+/* Admin dashboard home — compact multi-column widget layout */
+.admin-dashboard-home {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-dashboard-home .admin-dash-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-dashboard-home .admin-dash-header .btn,
+.admin-dashboard-home .admin-dash-header .btn-group .btn {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.45rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Hide button label text but keep icon for compact mode on smaller screens */
+@media (max-width: 991.98px) {
+  .compact-md-hide-text { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .compact-md-hide-text i { margin-right: 0; }
+  .compact-md-hide-text { overflow: hidden; }
+  .compact-md-hide-text { font-size: 0.72rem; }
+  .compact-md-hide-text > :not(i) { display: none; } /* hide text nodes/elements other than the icon */
+}
+
+/* On very small screens, show full-width stacked buttons as before but still compact */
+@media (max-width: 767.98px) {
+  .compact-md-hide-text > :not(i) { display: inline; } /* allow labels when stacked for clarity */
+  .compact-md-hide-text i { margin-right: .5rem; }
+}
+
+/* Allow actions region to shrink and wrap without creating a scrollbar */
+.admin-dashboard-home .admin-dash-header .admin-dash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-width: 100%;
+  overflow: visible; /* ensure no horizontal scrollbar */
+}
+
+@media (max-width: 767.98px) {
+  .admin-dashboard-home .admin-dash-header .admin-dash-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .admin-dashboard-home .admin-dash-header .admin-dash-actions .admin-dash-actions-nav {
+    display: contents;
+  }
+
+  .admin-dashboard-home .admin-dash-header .admin-dash-actions > .btn {
+  width: 100%;
+  margin: 0;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  min-height: 2.2rem;
+  }
+
+  /* Last control full width (2×2×1-style finish for toggles) */
+  .admin-dashboard-home .admin-dash-header .admin-dash-actions > .btn:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.admin-dash-grid {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-dash-grid--top {
+  grid-template-columns: 1fr;
+  margin-bottom: 0.75rem;
+}
+
+/* Enrolled Students + Quick stats side by side on desktop/tablet landscape */
+@media (min-width: 768px) {
+  .admin-dash-grid--top {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) !important;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .admin-dash-grid--top > .admin-dash-widget {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .admin-dash-grid--top {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) !important;
+  }
+}
+
+.admin-dash-grid--bottom {
+  grid-template-columns: 1fr;
+}
+
+/* Recent applications + grade chart + announcements in one row on desktop */
+@media (min-width: 768px) {
+  .admin-dash-grid--bottom {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .admin-dash-grid--bottom > .admin-dash-widget {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+}
+
+.admin-dash-grid > .admin-dash-widget {
+  min-width: 0;
+}
+
+.admin-dash-card {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.admin-dash-card .card-header {
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+}
+
+.admin-dash-card .card-header .card-title {
+  font-size: 0.85rem;
+}
+
+.admin-dash-card .card-header small {
+  font-size: 0.7rem;
+}
+
+.admin-dash-card .card-body {
+  padding: 0.5rem 0.75rem;
+}
+
+.admin-dash-total-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 0;
+}
+
+.admin-dash-chart {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-dash-chart--sm {
+  height: 120px;
+}
+
+.admin-dash-chart--md {
+  height: 180px;
+}
+
+.admin-dash-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.admin-dash-stat-grid {
+  display: grid !important;
+  /* Force a 2x2 layout (two columns, auto rows) so tiles form a 2x2 grid */
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: 1fr; /* make rows equal height */
+  gap: 0.5rem;
+  margin: 0 !important;
+  height: 100% !important; /* allow grid to fill parent card-body */
+}
+
+/* Keep two columns on larger screens as well; remove 4-column behavior so tiles stay 2x2 */
+
+/* Ensure the tile inner content stretches to fill each grid cell */
+.admin-dash-stat-grid > .admin-dash-stat-cell .flex-fill,
+.admin-dash-stat-grid .flex-fill {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.35rem !important;
+}
+
+.admin-dash-stat-grid > .admin-dash-stat-cell,
+.admin-dash-stat-grid > .col-6 {
+  width: 100%;
+  max-width: 100%;
+  flex: none;
+  padding: 0;
+  min-width: 0;
+}
+
+.admin-dash-stat-grid .flex-fill {
+  padding: 0.5rem 0.35rem !important;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.admin-dash-stat-grid .flex-fill i {
+  font-size: 1.1rem !important;
+  margin-bottom: 0 !important;
+}
+
+.admin-dash-stat-grid .fw-bold.fs-1 {
+  font-size: 1.25rem !important;
+  line-height: 1.1 !important;
+}
+
+.admin-dash-stat-grid .badge.fs-5 {
+  font-size: 0.65rem !important;
+  padding: 0.25rem 0.4rem !important;
+  white-space: normal;
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.admin-dash-stat-grid small {
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.admin-dashboard-home .list-group-item {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+
+@media (max-width: 767.98px) {
+  .admin-dash-grid--bottom {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .admin-dash-chart--md {
+    height: 160px;
+  }
 }

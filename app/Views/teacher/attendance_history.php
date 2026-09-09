@@ -35,7 +35,7 @@
                         <?php 
                         $sections = [];
                         foreach ($students as $student) {
-                            $sectionKey = $student['grade_level'] . ' - ' . $student['section_name'];
+                            $sectionKey = grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name'];
                             if (!in_array($sectionKey, $sections)) {
                                 $sections[] = $sectionKey;
                             }

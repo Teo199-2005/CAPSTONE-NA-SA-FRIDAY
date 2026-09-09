@@ -94,7 +94,7 @@
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
     <h5 class="card-title mb-0">
-      <i class="bi bi-list-ul me-2 text-primary"></i>Sent Notifications
+      <i class="bi bi-list-ul me-2 dash-icon-inline"></i>Sent Notifications
     </h5>
     <div class="d-flex gap-2">
       <span class="badge bg-info" id="totalSent">Total: <?= count($sentNotifications) ?></span>

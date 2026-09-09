@@ -19,10 +19,11 @@ class Notifications extends BaseController
             return redirect()->to(base_url('/'));
         }
         return view('student/notifications', [
-            'title' => 'Notifications - LPHS SMS',
+            'title' => 'Notifications - CSCS SMS',
         ]);
     }
 }
+
 
 
 

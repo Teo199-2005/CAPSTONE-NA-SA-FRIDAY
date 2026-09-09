@@ -5,16 +5,14 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="bi bi-person-circle text-primary"></i> 
-                        Student Application Details
+                        <i class="bi bi-person-circle dash-icon-inline"></i> 
+                        <?= isset($isArchived) && $isArchived ? 'Archived ' : '' ?>Student Application Details
+                        <?php if (isset($isArchived) && $isArchived): ?>
+                            <span class="badge bg-secondary ms-2">Archived</span>
+                        <?php endif; ?>
                     </h5>
-                    <div>
-                        <a href="<?= base_url('admin/students') ?>" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-arrow-left"></i> Back to Students
-                        </a>
-                    </div>
                 </div>
                 <div class="card-body">
                     <?= view('admin/partials/student_details_modal', ['student' => $student, 'documents' => $documents]) ?>
@@ -76,33 +74,6 @@
 </div>
 
 <script>
-function showImageModal(imageUrl, title) {
-    const modal = document.getElementById('documentViewerModal');
-    const image = document.getElementById('documentViewerImage');
-    const titleElement = document.getElementById('documentViewerTitle');
-    
-    if (modal && image && titleElement) {
-        titleElement.textContent = title;
-        image.src = imageUrl;
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeDocumentModal() {
-    const modal = document.getElementById('documentViewerModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-}
-
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeDocumentModal();
-    }
-});
-
 // Handle password reset form
 document.addEventListener('DOMContentLoaded', function() {
     const passwordForm = document.getElementById('passwordResetForm');

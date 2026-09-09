@@ -64,6 +64,19 @@
             <div class="form-text">Minimum 8 characters</div>
           </div>
         </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="confirm_password" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+            <div class="position-relative">
+              <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+              <button type="button" class="btn position-absolute" id="toggleConfirmPassword" 
+                      style="right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6b7280; z-index: 10;">
+                <i class="bi bi-eye" id="toggleConfirmIcon"></i>
+              </button>
+            </div>
+            <div class="form-text">Re-enter the same password to confirm</div>
+          </div>
+        </div>
       </div>
 
       <!-- Personal Information -->
@@ -95,8 +108,15 @@
         <div class="col-md-3">
           <div class="mb-3">
             <label for="suffix" class="form-label">Suffix</label>
-            <input type="text" class="form-control" id="suffix" name="suffix" 
-                   value="<?= old('suffix') ?>" placeholder="Jr., Sr., III">
+            <select class="form-select" id="suffix" name="suffix">
+              <option value="">None</option>
+              <option value="Jr." <?= old('suffix') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+              <option value="Sr." <?= old('suffix') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+              <option value="II" <?= old('suffix') === 'II' ? 'selected' : '' ?>>II</option>
+              <option value="III" <?= old('suffix') === 'III' ? 'selected' : '' ?>>III</option>
+              <option value="IV" <?= old('suffix') === 'IV' ? 'selected' : '' ?>>IV</option>
+              <option value="V" <?= old('suffix') === 'V' ? 'selected' : '' ?>>V</option>
+            </select>
           </div>
         </div>
         <div class="col-md-6">
@@ -149,12 +169,9 @@
             <label for="grade_level" class="form-label">Grade Level <span class="text-danger">*</span></label>
             <select class="form-select" id="grade_level" name="grade_level" required>
               <option value="">Select Grade Level</option>
-              <option value="7" <?= old('grade_level') === '7' ? 'selected' : '' ?>>Grade 7</option>
-              <option value="8" <?= old('grade_level') === '8' ? 'selected' : '' ?>>Grade 8</option>
-              <option value="9" <?= old('grade_level') === '9' ? 'selected' : '' ?>>Grade 9</option>
-              <option value="10" <?= old('grade_level') === '10' ? 'selected' : '' ?>>Grade 10</option>
-              <option value="11" <?= old('grade_level') === '11' ? 'selected' : '' ?>>Grade 11</option>
-              <option value="12" <?= old('grade_level') === '12' ? 'selected' : '' ?>>Grade 12</option>
+              <?php foreach (grade_level_options() as $g): ?>
+                <option value="<?= $g ?>" <?= old('grade_level') === (string) $g ? 'selected' : '' ?>><?= esc(grade_level_label($g)) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
         </div>
@@ -165,6 +182,7 @@
               <option value="">Select Type</option>
               <option value="New Student" <?= old('student_type') === 'New Student' ? 'selected' : '' ?>>New Student</option>
               <option value="Transferee" <?= old('student_type') === 'Transferee' ? 'selected' : '' ?>>Transferee</option>
+              <option value="Old Student" <?= old('student_type') === 'Old Student' ? 'selected' : '' ?>>Old Student</option>
             </select>
           </div>
         </div>
@@ -253,6 +271,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
     const toggleIcon = document.getElementById('toggleIcon');
+    const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const toggleConfirmIcon = document.getElementById('toggleConfirmIcon');
     
     if (togglePassword) {
         togglePassword.addEventListener('click', function() {
@@ -265,6 +286,21 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 toggleIcon.classList.remove('bi-eye-slash');
                 toggleIcon.classList.add('bi-eye');
+            }
+        });
+    }
+
+    if (toggleConfirmPassword) {
+        toggleConfirmPassword.addEventListener('click', function() {
+            const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            confirmPasswordInput.setAttribute('type', type);
+
+            if (type === 'text') {
+                toggleConfirmIcon.classList.remove('bi-eye');
+                toggleConfirmIcon.classList.add('bi-eye-slash');
+            } else {
+                toggleConfirmIcon.classList.remove('bi-eye-slash');
+                toggleConfirmIcon.classList.add('bi-eye');
             }
         });
     }

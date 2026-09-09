@@ -1,5 +1,4 @@
 <?php
-
 namespace Config;
 
 use Kint\Parser\ConstructablePluginInterface;

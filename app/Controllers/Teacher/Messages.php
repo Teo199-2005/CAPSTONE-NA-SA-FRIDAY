@@ -19,10 +19,11 @@ class Messages extends BaseController
             return redirect()->to(base_url('/'));
         }
         return view('teacher/messages', [
-            'title' => 'Messages - LPHS SMS',
+            'title' => 'Messages - CSCS SMS',
         ]);
     }
 }
+
 
 
 

@@ -14,7 +14,7 @@ class NotificationModel extends Model
     protected $protectFields = true;
 
     protected $allowedFields = [
-        'user_id', 'type', 'title', 'message', 'data', 'is_read', 'read_at'
+        'user_id', 'type', 'title', 'message', 'data', 'is_read', 'read_at', 'created_at', 'updated_at'
     ];
 
     protected $useTimestamps = true;

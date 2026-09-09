@@ -1,11 +1,9 @@
 <?php
-
 namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Models\StudentModel;
 use App\Models\SectionModel;
-use App\Models\EnrollmentDocumentModel;
 
 class IdCards extends BaseController
 {
@@ -18,13 +16,12 @@ class IdCards extends BaseController
 
     public function index()
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
         $studentModel = new StudentModel();
         $sectionModel = new SectionModel();
-        $documentModel = new EnrollmentDocumentModel();
 
         // Get filter parameters
         $gradeFilter = $this->request->getGet('grade');
@@ -35,7 +32,8 @@ class IdCards extends BaseController
 
         // Build query with filters - include all students, not just enrolled
         $builder = $studentModel->select('students.*, sections.section_name')
-            ->join('sections', 'sections.id = students.section_id', 'left');
+            ->join('sections', 'sections.id = students.section_id', 'left')
+            ->where('students.deleted_at IS NULL');
 
         if ($gradeFilter) {
             $builder->where('students.grade_level', $gradeFilter);
@@ -49,7 +47,7 @@ class IdCards extends BaseController
             $builder->groupStart()
                 ->like('students.first_name', $searchTerm)
                 ->orLike('students.last_name', $searchTerm)
-                ->orLike('students.student_id', $searchTerm)
+                ->orLike('students.lrn', $searchTerm)
                 ->groupEnd();
         }
 
@@ -58,22 +56,15 @@ class IdCards extends BaseController
         $totalPages = ceil($totalStudents / $perPage);
         $offset = ($page - 1) * $perPage;
 
-        $students = $builder->orderBy('students.created_at', 'DESC')
+        $students = $builder->groupBy('students.id')
+            ->orderBy('students.created_at', 'DESC')
             ->limit($perPage, $offset)
             ->get()
             ->getResultArray();
 
-        // Get student photos - check both enrollment documents and photo_path field
+        // Get student photos - use photo_path if available
         foreach ($students as &$student) {
-            // First try to get from enrollment documents
-            $photo = $documentModel->where('student_id', $student['id'])
-                ->where('document_type', 'photo')
-                ->first();
-            
-            if ($photo) {
-                $student['photo'] = $photo['file_path'];
-            } elseif (!empty($student['photo_path'])) {
-                // Fallback to photo_path field in students table
+            if (!empty($student['photo_path'])) {
                 $student['photo'] = $student['photo_path'];
             } else {
                 $student['photo'] = null;
@@ -88,7 +79,7 @@ class IdCards extends BaseController
             ->findAll();
 
         return view('admin/id_cards', [
-            'title' => 'Student ID Cards - LPHS SMS',
+            'title' => 'Student ID Cards - CSCS SMS',
             'students' => $students,
             'allSections' => $allSections,
             'gradeFilter' => $gradeFilter,
@@ -102,12 +93,11 @@ class IdCards extends BaseController
 
     public function viewCard($studentId)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
         $studentModel = new StudentModel();
-        $documentModel = new EnrollmentDocumentModel();
 
         $student = $studentModel->select('students.*, sections.section_name')
             ->join('sections', 'sections.id = students.section_id', 'left')
@@ -119,12 +109,35 @@ class IdCards extends BaseController
         }
 
         // Get student photo
-        $photo = $documentModel->where('student_id', $studentId)
-            ->where('document_type', 'photo')
-            ->first();
-        $student['photo'] = $photo ? $photo['file_path'] : null;
+        $student['photo'] = !empty($student['photo_path']) ? $student['photo_path'] : null;
 
-        return view('admin/id_card_view', [
+        return view('admin/id_card_clean', [
+            'title' => 'Student ID Card - ' . $student['first_name'] . ' ' . $student['last_name'],
+            'student' => $student
+        ]);
+    }
+
+    public function printCard($studentId)
+    {
+        if (! is_any_admin()) {
+            return redirect()->to(base_url('/'));
+        }
+
+        $studentModel = new StudentModel();
+
+        $student = $studentModel->select('students.*, sections.section_name')
+            ->join('sections', 'sections.id = students.section_id', 'left')
+            ->where('students.id', $studentId)
+            ->first();
+
+        if (!$student) {
+            return redirect()->back()->with('error', 'Student not found');
+        }
+
+        // Get student photo
+        $student['photo'] = !empty($student['photo_path']) ? $student['photo_path'] : null;
+
+        return view('admin/id_card_print', [
             'title' => 'Student ID Card - ' . $student['first_name'] . ' ' . $student['last_name'],
             'student' => $student
         ]);
@@ -132,7 +145,7 @@ class IdCards extends BaseController
 
     public function generateLrn($studentId)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
@@ -168,3 +181,4 @@ class IdCards extends BaseController
         }
     }
 }
+

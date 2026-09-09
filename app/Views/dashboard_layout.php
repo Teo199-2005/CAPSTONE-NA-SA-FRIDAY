@@ -3,94 +3,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title><?= esc($title ?? 'Dashboard - LPHS SMS') ?></title>
+  <?php
+    $docTitle = (string) ($title ?? 'Dashboard - CSCS SMS');
+    $docParts = explode(' - ', $docTitle, 2);
+    $docSub = trim($docParts[1] ?? '');
+    if ($docSub === '' || ctype_digit($docSub)) {
+      $docSub = 'CSCS SMS';
+    }
+    $docTitle = $docParts[0] . ' - ' . $docSub;
+  ?>
+  <title><?= esc($docTitle) ?></title>
+  <?= view('partials/site_head_meta', [
+    'headMetaTitle' => $docTitle,
+    'headMetaDescription' => $headMetaDescription ?? 'Cauayan South Central School — CSCS Tap n Track portal.',
+  ]) ?>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <link href="<?= base_url('css/app.css') ?>" rel="stylesheet" />
-  <link href="<?= base_url('css/dashboard.css') ?>" rel="stylesheet" />
+  <?php
+    $cssV = static function (string $file): string {
+      $path = asset_file_path('css/' . $file);
+
+      return $path !== null ? (string) filemtime($path) : '1';
+    };
+    $jsV = static function (string $file): string {
+      $path = asset_file_path('js/' . $file);
+
+      return $path !== null ? (string) filemtime($path) : '1';
+    };
+  ?>
+  <link href="<?= asset_url('css/app.css') ?>?v=<?= $cssV('app.css') ?>" rel="stylesheet" />
+  <link href="<?= asset_url('css/dashboard.css') ?>?v=<?= $cssV('dashboard.css') ?>" rel="stylesheet" />
+  <link href="<?= asset_url('css/featured-poster.css') ?>?v=<?= $cssV('featured-poster.css') ?>" rel="stylesheet" />
+  <link href="<?= asset_url('css/responsive.css') ?>?v=<?= $cssV('responsive.css') ?>" rel="stylesheet" />
+  <link href="<?= asset_url('css/admin-table-enhancements.css') ?>" rel="stylesheet" />
+  <link href="<?= asset_url('css/modal-system.css') ?>" rel="stylesheet" />
 </head>
 <body class="dashboard-app">
   <!-- Sidebar -->
   <div class="app-sidebar-wrapper">
     <aside class="app-sidebar">
       <?php
-        $portalLabel = 'Student Portal';
-        $role = 'student';
-        $dashboardUrl = base_url('student/dashboard');
-        $accountPanelHref = base_url('student/profile');
-        $notificationsHref = base_url('student/notifications');
-        $navMain = [
-          ['href' => base_url('student/dashboard'), 'icon' => 'bi-house', 'label' => 'Dashboard'],
-          ['href' => base_url('student/grades'), 'icon' => 'bi-bar-chart-line', 'label' => 'My Grades'],
-          ['href' => base_url('student/materials'), 'icon' => 'bi-folder', 'label' => 'Materials'],
-          ['href' => base_url('student/announcements'), 'icon' => 'bi-megaphone', 'label' => 'Announcements'],
-          ['href' => base_url('student/profile'), 'icon' => 'bi-person-circle', 'label' => 'Profile'],
-
-        ];
+        helper('portal_nav');
+        $authUser = null;
         try {
-          $auth = auth();
-          if ($auth->loggedIn()) {
-            $user = $auth->user();
-            if ($user->inGroup('admin')) {
-              $role = 'admin';
-              $portalLabel = 'Admin Portal';
-              $dashboardUrl = base_url('admin/dashboard');
-              $accountPanelHref = base_url('admin/users');
-              $notificationsHref = base_url('admin/notifications');
-              $navMain = [
-                ['href' => base_url('admin/dashboard'), 'icon' => 'bi-speedometer2', 'label' => 'Dashboard'],
-                ['href' => base_url('admin/students/pending'), 'icon' => 'bi-clock-history', 'label' => 'Pending Applications', 'badge' => 'pending-applications-count'],
-                ['href' => base_url('admin/students'), 'icon' => 'bi-people-fill', 'label' => 'Students'],
-                ['href' => base_url('admin/teachers'), 'icon' => 'bi-person-video3', 'label' => 'Teachers'],
-                ['href' => base_url('admin/sections'), 'icon' => 'bi-grid-3x3-gap', 'label' => 'Sections & Subjects'],
-                ['href' => base_url('admin/analytics'), 'icon' => 'bi-graph-up', 'label' => 'Analytics'],
-                ['href' => base_url('admin/announcements'), 'icon' => 'bi-megaphone', 'label' => 'Announcements'],
-                ['href' => base_url('admin/password-resets'), 'icon' => 'bi-key', 'label' => 'Password Resets'],
-              ];
-            } elseif ($user->inGroup('teacher')) {
-              $role = 'teacher';
-              $portalLabel = 'Teacher Portal';
-              $dashboardUrl = base_url('teacher/dashboard');
-              $accountPanelHref = base_url('teacher/dashboard');
-              $notificationsHref = base_url('teacher/announcements');
-              $navMain = [
-                ['href' => base_url('teacher/dashboard'), 'icon' => 'bi-speedometer2', 'label' => 'Dashboard'],
-                ['href' => base_url('teacher/students'), 'icon' => 'bi-people-fill', 'label' => 'My Students'],
-                ['href' => base_url('teacher/sections'), 'icon' => 'bi-grid-3x3-gap', 'label' => 'My Sections'],
-                ['href' => base_url('teacher/grades'), 'icon' => 'bi-bar-chart-line', 'label' => 'Enter Grades'],
-                ['href' => base_url('teacher/attendance'), 'icon' => 'bi-calendar-check', 'label' => 'Attendance'],
-                ['href' => base_url('teacher/schedule'), 'icon' => 'bi-calendar-event', 'label' => 'My Schedule'],
-                ['href' => base_url('teacher/analytics'), 'icon' => 'bi-graph-up', 'label' => 'Analytics'],
-                ['href' => base_url('teacher/announcements'), 'icon' => 'bi-megaphone', 'label' => 'Announcements'],
-                ['href' => base_url('teacher/profile'), 'icon' => 'bi-person-circle', 'label' => 'Profile'],
-              ];
-            } elseif ($user->inGroup('parent')) {
-              $role = 'parent';
-              $portalLabel = 'Parent Portal';
-              $dashboardUrl = base_url('parent/dashboard');
-              $accountPanelHref = base_url('parent/dashboard');
-              $notificationsHref = base_url('parent/announcements');
-              $navMain = [
-                ['href' => base_url('parent/dashboard'), 'icon' => 'bi-speedometer2', 'label' => 'Dashboard'],
-                ['href' => base_url('parent/children'), 'icon' => 'bi-people', 'label' => 'My Children'],
-                ['href' => base_url('parent/announcements'), 'icon' => 'bi-megaphone', 'label' => 'Announcements'],
-              ];
-            }
-          } else {
-            // In dev/test mode, default to student nav so pages are browsable
-            if (defined('ENVIRONMENT') && ENVIRONMENT !== 'production') {
-              $role = 'student';
-            }
+          if (auth()->loggedIn()) {
+            $authUser = auth()->user();
           }
         } catch (\Throwable $e) {
-          // fall back to student defaults
+          $authUser = null;
         }
+
+        $portalNav = portal_nav_for_user($authUser);
+        $role               = $portalNav['role'];
+        $portalLabel        = $portalNav['portal_label'];
+        $dashboardUrl       = $portalNav['dashboard_url'];
+        $accountPanelHref   = $portalNav['account_panel_href'];
+        $notificationsHref  = $portalNav['notifications_href'];
+        $navSections        = $portalNav['sections'];
       ?>
       <!-- Sidebar Header -->
       <div class="app-sidebar-header">
         <a href="<?= $dashboardUrl ?>" class="d-flex align-items-center text-decoration-none">
           <div class="app-brand-text">
-            <div class="app-brand-title">LPHS SMS</div>
+            <div class="app-brand-title">CSCS Tap n Track</div>
             <div class="app-brand-subtitle"><?= esc($portalLabel) ?></div>
           </div>
         </a>
@@ -104,22 +82,13 @@
         <div class="user-greeting">
           <div class="greeting-text">
             <?php 
-              $currentHour = (int)date('H');
-              if ($currentHour >= 5 && $currentHour < 12) {
-                $greeting = 'Good Morning';
-              } elseif ($currentHour >= 12 && $currentHour < 17) {
-                $greeting = 'Good Afternoon';
-              } elseif ($currentHour >= 17 && $currentHour < 21) {
-                $greeting = 'Good Evening';
-              } else {
-                $greeting = 'Good Night';
-              }
+              $greeting = 'Welcome';
               
               $user = auth()->user();
               $userName = 'User';
               
-              if ($user->inGroup('admin')) {
-                $userName = 'Admin';
+              if (function_exists('user_is_any_admin') && user_is_any_admin($user)) {
+                $userName = $user->inGroup('admin_staff') ? 'Admin staff' : 'Admin';
               } elseif ($user->inGroup('teacher')) {
                 // Try to get teacher name from teachers table
                 $db = \Config\Database::connect();
@@ -155,36 +124,60 @@
       <?php endif; ?>
 
       <!-- Sidebar Navigation -->
-      <nav>
-        <div class="app-sidebar-section-title">Main Navigation</div>
+      <nav class="app-sidebar-nav" aria-label="Portal navigation">
         <?php
           $currentPath = rtrim(parse_url(current_url(), PHP_URL_PATH) ?: '', '/');
-        ?>
-        <ul class="app-sidebar-menu">
-          <?php foreach ($navMain as $item):
-            $itemPath = rtrim(parse_url($item['href'], PHP_URL_PATH) ?: '', '/');
-            $isActive = $itemPath !== '' && ($currentPath === $itemPath || str_starts_with($currentPath . '/', $itemPath . '/'));
-          ?>
-            <li>
-              <a href="<?= $item['href'] ?>" class="app-sidebar-link<?= $isActive ? ' active' : '' ?>" data-label="<?= esc($item['label']) ?>"<?= $isActive ? ' aria-current="page"' : '' ?>>
-                <i class="bi <?= esc($item['icon']) ?>"></i><span><?= esc($item['label']) ?></span>
-                <?php if (isset($item['badge'])): ?>
-                  <span class="badge bg-danger ms-auto" id="<?= $item['badge'] ?>" style="display: none;"></span>
-                <?php endif; ?>
-              </a>
-            </li>
-          <?php endforeach; ?>
-        </ul>
+          $activeItemPath = '';
+          $activeMatchLen = -1;
 
-        <div class="app-sidebar-section-title">Quick Access</div>
-        <ul class="app-sidebar-menu">
-          <li><a href="<?= base_url('faq') ?>" class="app-sidebar-link" data-label="FAQ Chatbot"><i class="bi bi-question-circle"></i><span>FAQ Chatbot</span></a></li>
-        </ul>
+          foreach ($navSections as $sectionScan) {
+            foreach (($sectionScan['items'] ?? []) as $itemScan) {
+              $scanPath = rtrim(parse_url($itemScan['href'] ?? '', PHP_URL_PATH) ?: '', '/');
+              if ($scanPath === '') {
+                continue;
+              }
+              $scanMatches = $currentPath === $scanPath || str_starts_with($currentPath . '/', $scanPath . '/');
+              if (! $scanMatches) {
+                continue;
+              }
+
+              $scanLen = strlen($scanPath);
+              if ($scanLen > $activeMatchLen) {
+                $activeMatchLen = $scanLen;
+                $activeItemPath = $scanPath;
+              }
+            }
+          }
+
+          foreach ($navSections as $section):
+        ?>
+          <div class="app-sidebar-section-title"><?= esc($section['title']) ?></div>
+          <ul class="app-sidebar-menu">
+            <?php foreach ($section['items'] as $item):
+              $itemPath = rtrim(parse_url($item['href'], PHP_URL_PATH) ?: '', '/');
+              $isActive = $itemPath !== '' && $itemPath === $activeItemPath;
+            ?>
+              <li>
+                <a href="<?= $item['href'] ?>" class="app-sidebar-link<?= $isActive ? ' active' : '' ?>" data-label="<?= esc($item['label']) ?>"<?= $isActive ? ' aria-current="page"' : '' ?>>
+                  <i class="bi <?= esc($item['icon']) ?>" aria-hidden="true"></i>
+                  <span class="app-sidebar-link-text"><?= esc($item['label']) ?></span>
+                  <?php if (! empty($item['badge'])): ?>
+                    <span class="badge bg-danger app-sidebar-badge ms-auto flex-shrink-0" id="<?= esc($item['badge']) ?>" style="display: none;"></span>
+                  <?php endif; ?>
+                </a>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endforeach; ?>
 
         <div class="app-sidebar-divider"></div>
-        <div class="app-sidebar-section-title">Account</div>
-        <ul class="app-sidebar-menu">
-          <li><a href="<?= base_url('logout') ?>" class="app-sidebar-link" data-label="Logout"><i class="bi bi-box-arrow-left"></i><span>Logout</span></a></li>
+        <div class="app-sidebar-section-title">Session</div>
+        <ul class="app-sidebar-menu app-sidebar-menu-account">
+          <li>
+            <a href="<?= base_url('logout') ?>" class="app-sidebar-link app-sidebar-link-logout" data-label="Logout">
+              <i class="bi bi-box-arrow-left" aria-hidden="true"></i><span class="app-sidebar-link-text">Logout</span>
+            </a>
+          </li>
         </ul>
       </nav>
     </aside>
@@ -195,6 +188,20 @@
 
   <!-- Main Content -->
   <div class="main-content">
+    <!-- Breadcrumb Navigation -->
+    <div class="container-fluid px-4">
+      <nav aria-label="breadcrumb" class="breadcrumb-nav">
+        <ol class="breadcrumb mb-0 py-2">
+          <li class="breadcrumb-item"><a href="<?= $dashboardUrl ?? base_url('dashboard') ?>"><i class="bi bi-house me-1"></i>Home</a></li>
+          <?php
+            $breadcrumbParts = explode(' - ', $pageTitle ?? 'Dashboard', 2);
+            $currentPage = trim($breadcrumbParts[0] ?? 'Dashboard');
+          ?>
+          <li class="breadcrumb-item active" aria-current="page"><?= esc($currentPage) ?></li>
+        </ol>
+      </nav>
+    </div>
+
     <!-- Top Bar -->
     <div class="top-bar">
       <div class="d-flex justify-content-between align-items-center">
@@ -205,123 +212,141 @@
           <button class="app-desktop-collapse d-none d-lg-inline-flex btn btn-outline-secondary btn-sm me-3" type="button" aria-label="Collapse sidebar">
             <i class="bi bi-layout-sidebar-inset"></i>
           </button>
-          <?php $pageTitle = (string) ($title ?? 'Dashboard'); $parts = explode(' - ', $pageTitle, 2); ?>
-          <h4 class="mb-0 top-bar-title">
-            <span class="title-main"><?= esc($parts[0]) ?></span><?php if (!empty($parts[1])): ?> <span class="title-sub">- <?= esc($parts[1]) ?></span><?php endif; ?>
-          </h4>
+          <?php
+            $pageTitle = (string) ($title ?? 'Dashboard');
+            $parts = explode(' - ', $pageTitle, 2);
+            $subtitle = trim($parts[1] ?? '');
+            if ($subtitle === '' || ctype_digit($subtitle)) {
+              $subtitle = 'CSCS SMS';
+            }
+          ?>
+          <div class="top-bar-title-wrap">
+            <h1 class="mb-0 top-bar-title">
+              <span class="title-main"><?= esc($parts[0]) ?></span><span class="title-sub"> <?= esc($subtitle) ?></span>
+            </h1>
+          </div>
         </div>
-        <div class="top-bar-actions">
+        <div class="top-bar-actions d-flex align-items-center gap-2">
+          <a
+            href="<?= esc($notificationsHref ?? base_url('notifications')) ?>"
+            class="top-bar-icon-btn top-bar-notification-bell"
+            aria-label="Notifications"
+            title="Notifications"
+          >
+            <i class="bi bi-bell"></i>
+          </a>
+          <a
+            href="<?= esc($accountPanelHref ?? base_url('/')) ?>"
+            class="top-bar-icon-btn top-bar-profile-btn"
+            aria-label="Profile"
+            title="Profile"
+          >
+            <i class="bi bi-person-circle"></i>
+          </a>
         </div>
       </div>
     </div>
 
     <!-- Page Content -->
     <main class="page-content">
-      <div class="container-fluid py-4">
+      <div class="dashboard-page-container">
         <?= $this->renderSection('content') ?>
       </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="modern-footer">
-    <div class="footer-content">
-      <div class="footer-brand">
-        <img src="<?= base_url('LPHS2.png') ?>" alt="LPHS" style="width: 100px; height: 100px; margin-bottom: 15px;" />
-        <h3>LPHS SMS</h3>
-        <p>Empowering students with modern education management through innovative technology solutions.</p>
-        <div class="social-links">
-          <a href="#"><i class="bi bi-facebook"></i></a>
-          <a href="#"><i class="bi bi-twitter"></i></a>
-          <a href="#"><i class="bi bi-linkedin"></i></a>
-          <a href="#"><i class="bi bi-instagram"></i></a>
+    <footer class="dashboard-footer" role="contentinfo">
+      <div class="dashboard-footer-bar" aria-hidden="true"></div>
+      <div class="dashboard-footer-mobile">
+        <div class="dashboard-footer-mobile-brand">
+          <img src="<?= asset_url('LPHS2.png') ?>" alt="" width="28" height="28" />
+          <span>CSCS Tap n Track</span>
+        </div>
+        <p class="dashboard-footer-mobile-meta">&copy; <?= date('Y') ?> · v2.1.0</p>
+      </div>
+      <div class="dashboard-footer-inner dashboard-footer-inner--desktop">
+        <div class="dashboard-footer-grid">
+          <div class="dashboard-footer-brand">
+            <img src="<?= asset_url('LPHS2.png') ?>" alt="CSCS" />
+            <div>
+              <p class="dashboard-footer-brand-title">CSCS Tap n Track</p>
+              <p class="dashboard-footer-brand-sub">Modern Education Management</p>
+            </div>
+          </div>
+          <div class="dashboard-footer-contact">
+            <a href="https://maps.google.com/?q=WQ8Q%2BJ5V%20Cauayan%20City" target="_blank" rel="noopener">
+              <i class="bi bi-geo-alt" aria-hidden="true"></i>
+              <span>Mabini St., District I, Cauayan City, Isabela</span>
+            </a>
+            <span><i class="bi bi-pin-map" aria-hidden="true"></i> WQ8Q+J5V, Cauayan City</span>
+            <span><i class="bi bi-clock" aria-hidden="true"></i> 24/7 System Access</span>
+          </div>
+          <div class="dashboard-footer-aside">
+            <a href="https://www.facebook.com/cauayan.south.central" target="_blank" rel="noopener" class="dashboard-footer-social" aria-label="Facebook">
+              <i class="bi bi-facebook" aria-hidden="true"></i>
+            </a>
+            <p class="dashboard-footer-copy">&copy; <?= date('Y') ?> CSCS Tap n Track<br>Version 2.1.0</p>
+          </div>
         </div>
       </div>
-
-      <div class="footer-links">
-        <h4>Quick Links</h4>
-        <ul>
-          <li><a href="<?= $dashboardUrl ?>">Dashboard</a></li>
-          <li><a href="<?= base_url('faq') ?>">FAQ</a></li>
-          <li><a href="#">Support</a></li>
-          <li><a href="#">Help Center</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-resources">
-        <h4>Resources</h4>
-        <ul>
-          <li><a href="#">Documentation</a></li>
-          <li><a href="#">Training</a></li>
-          <li><a href="#">System Status</a></li>
-          <li><a href="#">API Guide</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-contact">
-        <h4>Contact Info</h4>
-        <div class="contact-item">
-          <i class="bi bi-geo-alt"></i>
-          <span>Lourdes, Nabua, Camarines Sur</span>
-        </div>
-        <div class="contact-item">
-          <i class="bi bi-telephone"></i>
-          <span>(000) 123-4567</span>
-        </div>
-        <div class="contact-item">
-          <i class="bi bi-envelope"></i>
-          <span>info@lphs.edu</span>
-        </div>
-        <div class="contact-item">
-          <i class="bi bi-clock"></i>
-          <span>24/7 System Access</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer-bottom">
-      <div class="footer-bottom-left">
-        <p>&copy; 2025 LPHS SMS. All rights reserved.</p>
-        <span class="version">Version 1.0.0</span>
-      </div>
-      <div class="footer-bottom-right">
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms of Service</a>
-        <a href="#">Security</a>
-      </div>
-    </div>
     </footer>
   </div>
 
+  <?php
+  // Full-viewport overlays (modals, etc.) must render here — outside .main-content — so they are
+  // not capped by .main-content > * { z-index: 1 } and sit above the fixed sidebar / sticky top bar.
+  ?>
+  <?= $this->renderSection('portal_overlays') ?>
+
+  <div id="dashboard-modal-portal" aria-hidden="true" role="region" aria-label="Modal dialogs"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Load password reset count and pending applications count for admin users
-    <?php if (auth()->user() && auth()->user()->inGroup('admin')): ?>
-
-
-    function loadPendingApplicationsCount() {
-      fetch('<?= base_url('admin/students/pending-count') ?>')
-        .then(response => response.json())
-        .then(data => {
-          const badge = document.getElementById('pending-applications-count');
-          if (badge && data.count > 0) {
-            badge.textContent = data.count;
-            badge.style.display = 'inline-block';
-          } else if (badge) {
-            badge.style.display = 'none';
-          }
-        })
-        .catch(error => console.error('Error loading pending applications count:', error));
+    window.gradeLevelLabels = <?= json_encode(grade_level_js_labels()) ?>;
+    window.formatGradeLevel = function(level) {
+      if (level === null || level === undefined || level === '') return 'N/A';
+      const key = String(level);
+      return window.gradeLevelLabels[key] ?? ('Grade ' + key);
+    };
+  </script>
+  <script src="<?= asset_url('js/mobile-tables.js') ?>?v=<?= $jsV('mobile-tables.js') ?>"></script>
+  <script src="<?= asset_url('js/admin-table-enhancements.js') ?>?v=<?= $jsV('admin-table-enhancements.js') ?>"></script>
+  <script src="<?= asset_url('js/dashboard-modals.js') ?>?v=<?= $jsV('dashboard-modals.js') ?>"></script>
+  <script src="<?= asset_url('js/modal-system.js') ?>?v=<?= $jsV('modal-system.js') ?>"></script>
+  <script>
+    // Load notification counts
+    <?php if (auth()->user()): ?>
+    function updateBadge(id, count) {
+      const badge = document.getElementById(id);
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = count;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
     }
 
-    // Load counts on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      loadPendingApplicationsCount();
-    });
+    function loadNotificationCounts() {
+      fetch('<?= base_url('api/notification-counts') ?>')
+        .then(response => response.json())
+        .then(data => {
+          if (data.pending_applications !== undefined) updateBadge('pending-applications-count', data.pending_applications);
+          if (data.password_resets !== undefined) updateBadge('password-resets-count', data.password_resets);
+          if (data.announcements !== undefined) updateBadge('announcements-count', data.announcements);
+          if (data.teacher_announcements !== undefined) updateBadge('teacher-announcements-count', data.teacher_announcements);
+          if (data.student_announcements !== undefined) updateBadge('student-announcements-count', data.student_announcements);
+          if (data.new_grades !== undefined) updateBadge('new-grades-count', data.new_grades);
+          if (data.schedule_updates !== undefined) updateBadge('schedule-updates-count', data.schedule_updates);
 
-    // Refresh counts every 30 seconds
-    setInterval(function() {
-      loadPendingApplicationsCount();
-    }, 30000);
+          // Topbar bell: do not show count badge (avoids "1" appearing next to page title)
+          // Sidebar items (Pending Applications, etc.) still show their counts.
+        })
+        .catch(error => console.error('Error loading notification counts:', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', loadNotificationCounts);
+    setInterval(loadNotificationCounts, 30000);
     <?php endif; ?>
   </script>
   <script>
@@ -380,221 +405,9 @@
     });
   </script>
 
-  <!-- LPHS Floating Chatbot Widget (Dashboard) -->
-  <style>
-    .lphs-chat-button { position: fixed; right: 20px; bottom: 20px; width: 50px; height: 50px; border-radius: 50%; background-color: #fbbf24; color: #000; border: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(251,191,36,0.3); cursor: pointer; z-index: 1055; transition: all 0.3s ease; }
-    .lphs-chat-button:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(251,191,36,0.4); }
-    .lphs-chat-button i { font-size: 20px !important; }
-    .lphs-chat-panel { position: fixed; right: 20px; bottom: 90px; width: 340px; max-height: 70vh; display: none; background: #fff; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.18); overflow: hidden; z-index: 1055; border: 1px solid rgba(0,0,0,.08); font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .lphs-chat-panel.open { display: flex; flex-direction: column; animation: lphs-slide-up .18s ease-out; }
-    @keyframes lphs-slide-up { from { transform: translateY(8px); opacity: .0; } to { transform: translateY(0); opacity: 1; } }
-    .lphs-chat-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,.06); background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 70%, #fbbf24 100%); color: #fff; }
-    .lphs-chat-header .title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
-    .lphs-chat-header .title .logo { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,.15); display: grid; place-items: center; font-size: 16px; }
-    .lphs-chat-messages { background: #f8f9fa; padding: 12px; overflow-y: auto; flex: 1; }
-    .lphs-msg { display: flex; margin-bottom: 10px; }
-    .lphs-msg.user { justify-content: flex-end; }
-    .lphs-bubble { max-width: 82%; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.35; box-shadow: 0 1px 0 rgba(0,0,0,.04); white-space: pre-wrap; word-wrap: break-word; }
-    .lphs-msg.user .lphs-bubble { background: #0d6efd; color: #fff; border-bottom-right-radius: 4px; }
-    .lphs-msg.bot .lphs-bubble { background: #fff; color: #212529; border-bottom-left-radius: 4px; border: 1px solid rgba(0,0,0,.06); }
-    .lphs-typing { display: inline-flex; align-items: center; gap: 3px; }
-    .lphs-typing .dot { width: 6px; height: 6px; background: #6c757d; border-radius: 999px; opacity: .6; animation: lphs-bounce 1.2s infinite; }
-    .lphs-typing .dot:nth-child(2) { animation-delay: .15s; }
-    .lphs-typing .dot:nth-child(3) { animation-delay: .3s; }
-    @keyframes lphs-bounce { 0%, 80%, 100% { transform: translateY(0); opacity: .4; } 40% { transform: translateY(-4px); opacity: 1; } }
-    .lphs-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .lphs-quick button { border: 1px solid rgba(13,110,253,.35); background: rgba(13,110,253,.06); color: #0b5ed7; padding: 4px 8px; border-radius: 999px; font-size: 12px; }
-    .lphs-chat-input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid rgba(0,0,0,.06); background: #fff; }
-    .lphs-chat-input input { flex: 1; border-radius: 8px; border: 1px solid rgba(0,0,0,.12); padding: 8px 10px; font-size: 13px; }
-    .lphs-chat-input button { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
-    @media (max-width: 420px){ .lphs-chat-panel{ right: 12px; left: 12px; width: auto; } .lphs-chat-button{ right: 12px; bottom: 12px; } }
-    .lphs-answer { background:#ffffff; border:1px solid rgba(0,0,0,.06); border-radius:10px; padding:8px 10px; }
-    .lphs-answer-title { font-weight:600; color:#0b5ed7; display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:12px; }
-    .lphs-answer-body { font-size:13px; color:#212529; }
-    
-    /* User Greeting Styles */
-    .user-greeting {
-      padding: 5px 20px;
-      background: linear-gradient(135deg, rgba(55, 65, 81, 0.3) 0%, rgba(75, 85, 99, 0.3) 50%, rgba(107, 114, 128, 0.3) 100%);
-      border-bottom: 2px solid rgba(55, 65, 81, 0.3);
-      margin-bottom: 15px;
-      box-shadow: 0 4px 12px rgba(55, 65, 81, 0.05);
-    }
-    
-    .greeting-text {
-      text-align: center;
-    }
-    
-    .greeting-main {
-      font-size: 15px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.9);
-      margin-bottom: 4px;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-    
-    .greeting-name {
-      font-size: 17px;
-      color: #ffffff;
-      font-weight: 700;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      letter-spacing: 0.3px;
-    }
-    
-    /* Responsive adjustments */
-    @media (max-width: 991.98px) {
-      .user-greeting {
-        padding: 4px 18px;
-      }
-      
-      .greeting-main {
-        font-size: 14px;
-      }
-      
-      .greeting-name {
-        font-size: 16px;
-      }
-    }
-  </style>
-
-  <button id="lphsChatBtn" class="lphs-chat-button" aria-label="Open LPHS AI Chatbot">
-    <i class="bi bi-robot"></i>
-  </button>
-
-  <section id="lphsChatPanel" class="lphs-chat-panel" aria-live="polite" aria-label="LPHS FAQ Chatbot">
-    <div class="lphs-chat-header">
-      <div class="title">
-        <span class="logo"><i class="bi bi-robot" style="font-size: 20px;"></i></span>
-        <span>LPHS AI Assistant</span>
-      </div>
-      <div class="d-flex align-items-center gap-1">
-        <button id="lphsChatClear" class="btn btn-sm btn-light" title="New chat"><i class="bi bi-stars"></i></button>
-        <button id="lphsChatMin" class="btn btn-sm btn-light" title="Minimize"><i class="bi bi-dash-lg"></i></button>
-      </div>
-    </div>
-    <div id="lphsChatMsgs" class="lphs-chat-messages"></div>
-    <div class="lphs-chat-input">
-      <input id="lphsChatInput" type="text" placeholder="Ask about enrollment, documents, grades…" />
-      <button id="lphsChatSend" aria-label="Send"><i class="bi bi-send"></i></button>
-    </div>
-  </section>
-
-  <script>
-    (function(){
-      const btn = document.getElementById('lphsChatBtn');
-      const panel = document.getElementById('lphsChatPanel');
-      const msgs = document.getElementById('lphsChatMsgs');
-      const input = document.getElementById('lphsChatInput');
-      const send = document.getElementById('lphsChatSend');
-      const min = document.getElementById('lphsChatMin');
-      const clearBtn = document.getElementById('lphsChatClear');
-
-      // Prototype: local KB first; we'll wire to backend later
-      const LOCAL_FAQ = [
-        { q: 'how do i enroll', a: 'To enroll, go to Enrollment > Fill out the online form > Upload requirements > Submit. You will receive a confirmation email.' , cat: 'Enrollment' },
-        { q: 'what documents do i need', a: 'Required documents: Birth Certificate, Form 138/Report Card, Good Moral Certificate, 2x2 ID Photo, and Proof of Residency.' , cat: 'Requirements' },
-        { q: 'when is the enrollment period', a: 'Enrollment period runs from May 15 to June 30. Late enrollment may be accommodated subject to availability.' , cat: 'Schedule' },
-        { q: 'how do i check my grades', a: 'Log in to your Student Portal > Grades section. Select the term to view detailed grades.' , cat: 'Grades' },
-        { q: 'school hours', a: 'Classes run from 7:30 AM to 4:30 PM, Monday to Friday. Some programs may vary by section.', cat: 'General' },
-        { q: 'payment', a: 'Payments can be made at the cashier or via the online payment portal. Keep your transaction receipt.', cat: 'Finance' },
-        { q: 'hi', a: 'Hi! Ask me about enrollment, requirements, schedules, or grades. You can also tap a quick question below.', cat: 'Greeting' },
-        { q: 'hello', a: 'Hello! I can help with FAQs like enrollment steps, documents, enrollment period, or checking grades.', cat: 'Greeting' }
-      ];
-
-      const quick = [ 'How do I enroll?', 'What documents do I need?', 'When is the enrollment period?', 'How do I check my grades?' ];
-
-      function escapeHtml(s){
-        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-      }
-
-      function bubble(html, who){
-        const wrap = document.createElement('div');
-        wrap.className = 'lphs-msg ' + (who === 'user' ? 'user' : 'bot');
-        const b = document.createElement('div');
-        b.className = 'lphs-bubble';
-        b.innerHTML = html;
-        wrap.appendChild(b);
-        msgs.appendChild(wrap);
-        msgs.scrollTop = msgs.scrollHeight;
-        return wrap;
-      }
-
-      function showTyping(){
-        const el = bubble('<span class="lphs-typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>','bot');
-        el.dataset.typing = '1';
-        return el;
-      }
-
-      function welcome(){
-        msgs.innerHTML = '';
-        bubble('<strong>Hello! I\'m the LPHS FAQ bot.</strong><br/><span class="text-muted">Try one of these quick questions:</span>','bot');
-        const qwrap = document.createElement('div'); qwrap.className = 'lphs-msg bot';
-        const b = document.createElement('div'); b.className = 'lphs-bubble';
-        const row = document.createElement('div'); row.className = 'lphs-quick';
-        quick.forEach(q => { const qb = document.createElement('button'); qb.type = 'button'; qb.textContent = q; qb.addEventListener('click', () => { input.value = q; doAsk(); }); row.appendChild(qb); });
-        b.appendChild(row); qwrap.appendChild(b); msgs.appendChild(qwrap);
-      }
-
-      function localAnswer(query){
-        const qn = query.toLowerCase().replace(/\s+/g,' ').trim();
-        let best = null; let score = 0;
-        for (const item of LOCAL_FAQ){
-          const t = item.q;
-          if (qn === t) { best = item; score = 100; break; }
-          const s = (qn.includes(t) ? t.length : 0);
-          if (s > score){ best = item; score = s; }
-        }
-        return best;
-      }
-
-      function renderAnswer(a){
-        const html = '<div class="lphs-answer">'
-          +'<div class="lphs-answer-title"><i class="bi bi-chat-square-quote"></i> '+escapeHtml(a.cat||'FAQ')+'</div>'
-          +'<div class="lphs-answer-body">'+escapeHtml(a.a)+'</div>'
-          +'</div>';
-        bubble(html, 'bot');
-      }
-
-      function doAsk(){
-        const q = input.value.trim();
-        if (!q) { input.focus(); return; }
-        bubble(escapeHtml(q), 'user');
-        input.value = '';
-        const t = showTyping();
-        const local = localAnswer(q);
-        setTimeout(() => {
-          t.remove();
-          if (local){
-            renderAnswer(local);
-          } else {
-            bubble('<span class="text-muted">I don\'t have that in my FAQ yet. Please try another phrasing.</span>', 'bot');
-          }
-        }, 500);
-        // backend call disabled for prototype
-      }
-
-      btn.addEventListener('click', () => {
-        panel.classList.toggle('open');
-        if (panel.classList.contains('open')){
-          if (!msgs.dataset.init){ msgs.dataset.init = '1'; welcome(); }
-          setTimeout(() => input.focus(), 150);
-        }
-      });
-      min.addEventListener('click', () => panel.classList.remove('open'));
-      if (clearBtn) clearBtn.addEventListener('click', () => { msgs.dataset.init = ''; welcome(); input.focus(); });
-      send.addEventListener('click', doAsk);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') doAsk(); });
-
-      // Trim history: keep last 50 nodes
-      const observer = new MutationObserver(() => {
-        const nodes = msgs.querySelectorAll('.lphs-msg');
-        if (nodes.length > 50) {
-          for (let i = 0; i < nodes.length - 50; i++) nodes[i].remove();
-        }
-      });
-      observer.observe(msgs, { childList: true });
-    })();
-  </script>
+  <?php if (isset($role) && in_array($role, ['student', 'teacher'], true)): ?>
+    <?= view('partials/platform_rating_logout_modal') ?>
+  <?php endif; ?>
 
 </body>
 </html>

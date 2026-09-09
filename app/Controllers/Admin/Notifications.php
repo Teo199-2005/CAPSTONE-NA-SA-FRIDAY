@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
@@ -17,7 +16,7 @@ class Notifications extends BaseController
 
     public function index()
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -27,7 +26,7 @@ class Notifications extends BaseController
         $sentNotifications = $this->getSentNotifications();
 
         return view('admin/notifications', [
-            'title' => 'Bulk Notifications - LPHS SMS',
+            'title' => 'Bulk Notifications - CSCS SMS',
             'sentNotifications' => $sentNotifications,
         ]);
     }
@@ -71,7 +70,7 @@ class Notifications extends BaseController
 
     public function send()
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -121,7 +120,7 @@ class Notifications extends BaseController
      */
     public function show($id)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -144,7 +143,7 @@ class Notifications extends BaseController
             ->findAll();
 
         return view('admin/notifications_show', [
-            'title' => 'Notification Details - LPHS SMS',
+            'title' => 'Notification Details - CSCS SMS',
             'notification' => $notification,
             'relatedNotifications' => $relatedNotifications,
         ]);
@@ -155,7 +154,7 @@ class Notifications extends BaseController
      */
     public function edit($id)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -167,7 +166,7 @@ class Notifications extends BaseController
         }
 
         return view('admin/notifications_edit', [
-            'title' => 'Edit Notification - LPHS SMS',
+            'title' => 'Edit Notification - CSCS SMS',
             'notification' => $notification,
         ]);
     }
@@ -177,7 +176,7 @@ class Notifications extends BaseController
      */
     public function update($id)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -206,7 +205,7 @@ class Notifications extends BaseController
      */
     public function delete($id)
     {
-        if (! $this->auth->user()->inGroup('admin')) {
+        if (! is_any_admin()) {
             return redirect()->to(base_url('/'));
         }
 
@@ -268,7 +267,7 @@ class Notifications extends BaseController
      */
     public function markAsRead()
     {
-        if (!$this->request->isAJAX() || !$this->auth->user()->inGroup('admin')) {
+        if (!$this->request->isAJAX() || ! is_any_admin()) {
             return $this->response->setStatusCode(403);
         }
 
@@ -288,7 +287,7 @@ class Notifications extends BaseController
      */
     public function getStats()
     {
-        if (!$this->request->isAJAX() || !$this->auth->user()->inGroup('admin')) {
+        if (!$this->request->isAJAX() || ! is_any_admin()) {
             return $this->response->setStatusCode(403);
         }
 
@@ -303,6 +302,7 @@ class Notifications extends BaseController
         return $this->response->setJSON($stats);
     }
 }
+
 
 
 

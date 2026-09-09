@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers\Teacher;
 
 use App\Controllers\BaseController;
@@ -8,7 +7,9 @@ class Debug extends BaseController
 {
     public function index()
     {
-        if (!auth()->user()->inGroup('teacher')) {
+        // Restricted: only master admin can access debug info
+        helper('admin_access');
+        if (! function_exists('is_master_admin') || ! is_master_admin()) {
             return redirect()->to(base_url('/'));
         }
 

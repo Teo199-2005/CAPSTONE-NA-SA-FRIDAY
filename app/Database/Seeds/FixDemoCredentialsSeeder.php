@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
@@ -22,7 +21,7 @@ class FixDemoCredentialsSeeder extends Seeder
         $student = $db->table('students')
                      ->where('first_name', 'Maria')
                      ->where('last_name', 'Santos')
-                     ->where('grade_level', 10)
+                     ->where('grade_level', 6)
                      ->get()
                      ->getRowArray();
 

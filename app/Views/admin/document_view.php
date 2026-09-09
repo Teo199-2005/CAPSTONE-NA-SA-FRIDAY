@@ -7,7 +7,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="bi bi-file-earmark-image text-primary"></i> 
+                        <i class="bi bi-file-earmark-image dash-icon-inline"></i> 
                         Document Viewer
                     </h5>
                     <div>

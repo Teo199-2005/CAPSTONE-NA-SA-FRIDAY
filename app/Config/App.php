@@ -1,5 +1,4 @@
 <?php
-
 namespace Config;
 
 use CodeIgniter\Config\BaseConfig;
@@ -16,7 +15,78 @@ class App extends BaseConfig
      *
      * E.g., http://example.com/
      */
-    public string $baseURL = 'http://localhost:8080/';
+    public string $baseURL = 'https://cauayansouthcentralschool.com/';
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $fromEnv = env('app.baseURL');
+        if (is_string($fromEnv) && $fromEnv !== '') {
+            $this->baseURL = rtrim($fromEnv, '/') . '/';
+
+            // On localhost/dev, honor the active request host+port+path
+            // (e.g. :8080 for `php spark serve`, /public_html for Apache subfolder).
+            if (! $this->isCliRequest() && $this->isLocalRequestHost()) {
+                $detected = $this->detectBaseURL();
+                if ($detected !== '') {
+                    $this->baseURL = $detected;
+                }
+            }
+
+            return;
+        }
+
+        $detected = $this->detectBaseURL();
+        if ($detected !== '') {
+            $this->baseURL = $detected;
+        }
+    }
+
+    protected function isCliRequest(): bool
+    {
+        return PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg';
+    }
+
+    protected function isLocalRequestHost(): bool
+    {
+        $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host === '') {
+            return false;
+        }
+
+        $hostname = explode(':', $host)[0];
+
+        return in_array($hostname, ['localhost', '127.0.0.1', '::1'], true);
+    }
+
+    /**
+     * Build base URL from the current HTTP request (works on live domain and localhost).
+     */
+    protected function detectBaseURL(): string
+    {
+        if ($this->isCliRequest()) {
+            return rtrim($this->baseURL, '/') . '/';
+        }
+
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        if ($host === '') {
+            return rtrim($this->baseURL, '/') . '/';
+        }
+
+        $https = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['SERVER_PORT'] ?? '') === '443')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        $scheme = $https ? 'https' : 'http';
+
+        $script = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
+        $path   = str_replace('\\', '/', dirname($script));
+        if ($path === '/' || $path === '\\' || $path === '.') {
+            $path = '';
+        }
+
+        return rtrim($scheme . '://' . $host . $path, '/') . '/';
+    }
 
     /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.
@@ -40,7 +110,7 @@ class App extends BaseConfig
      * something else. If you have configured your web server to remove this file
      * from your site URIs, set this variable to an empty string.
      */
-    public string $indexPage = 'index.php';
+    public string $indexPage = '';
 
     /**
      * --------------------------------------------------------------------------
@@ -133,7 +203,7 @@ class App extends BaseConfig
      * @see https://www.php.net/manual/en/timezones.php for list of timezones
      *      supported by PHP.
      */
-    public string $appTimezone = 'UTC';
+    public string $appTimezone = 'Asia/Manila';
 
     /**
      * --------------------------------------------------------------------------
@@ -157,7 +227,7 @@ class App extends BaseConfig
      * secure, the user will be redirected to a secure version of the page
      * and the HTTP Strict Transport Security (HSTS) header will be set.
      */
-    public bool $forceGlobalSecureRequests = false;
+    public bool $forceGlobalSecureRequests = true;
 
     /**
      * --------------------------------------------------------------------------

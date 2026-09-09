@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Libraries;
 
 class SupabaseEmailService
@@ -17,7 +16,7 @@ class SupabaseEmailService
     
     public function sendVerificationEmail($toEmail, $studentName, $lrn, $tempPassword = null)
     {
-        $subject = 'LPHS - Your Enrollment Application Has Been Approved';
+        $subject = 'CSCS - Your Enrollment Application Has Been Approved';
         
         $message = $this->getEmailTemplate($studentName, $lrn, $tempPassword);
         
@@ -28,7 +27,7 @@ class SupabaseEmailService
     
     public function sendRejectionEmail($toEmail, $studentName)
     {
-        $subject = 'LPHS - Enrollment Application Status Update';
+        $subject = 'CSCS - Enrollment Application Status Update';
         
         $message = $this->getRejectionEmailTemplate($studentName);
         
@@ -119,7 +118,7 @@ class SupabaseEmailService
         ];
         
         $email->initialize($config);
-        $email->setFrom('lphscodenectars@gmail.com', 'LPHS School System');
+        $email->setFrom('lphscodenectars@gmail.com', 'CSCS School System');
         $email->setTo($to);
         $email->setSubject($subject);
         $email->setMessage($htmlContent);
@@ -150,7 +149,7 @@ class SupabaseEmailService
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .header { background: #1e40af; color: white; padding: 20px; text-align: center; }
                 .content { padding: 20px; background: #f8f9fa; }
-                .button { background: #fbbf24; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+                .button { background: #fbbf24; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
                 .credentials { background: white; padding: 15px; border-left: 4px solid #fbbf24; margin: 15px 0; }
                 .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
             </style>
@@ -158,8 +157,8 @@ class SupabaseEmailService
         <body>
             <div class='container'>
                 <div class='header'>
-                    <h1>🎓 LPHS Enrollment Approved!</h1>
-                    <p>Lourdes Provincial High School</p>
+                    <h1>🎓 CSCS Enrollment Approved!</h1>
+                    <p>Cauayan South Central School</p>
                 </div>
                 
                 <div class='content'>
@@ -175,7 +174,7 @@ class SupabaseEmailService
                     
                     <p>You can now access the student portal using these credentials:</p>
                     
-                    <a href='" . base_url('login') . "' class='button'>Login to Student Portal</a>
+                    <a href='https://smslphs.site/login' class='button'>Login to Student Portal</a>
                     
                     <h3>⚠️ Important:</h3>
                     <ul>
@@ -185,13 +184,14 @@ class SupabaseEmailService
                         <li>Contact the school office if you have any issues</li>
                     </ul>
                     
-                    <p>Welcome to Lourdes Provincial High School! We look forward to your academic journey with us.</p>
+                    <p>Welcome to Cauayan South Central School! We look forward to your academic journey with us.</p>
                 </div>
                 
                 <div class='footer'>
-                    <p>Lourdes Provincial High School<br>
-                    Barangay Lourdes, Panglao Town, Bohol, Philippines<br>
-                    📞 +63 38 502 9000 | 📧 info@lphs.edu.ph</p>
+                    <p>Cauayan South Central School<br>
+                    Mabini Street, District I, Cauayan City, Isabela, Philippines<br>
+                    Plus Code: WQ8Q+J5V / WQJC+MM7, Cauayan City<br>
+                    Principal: Ronnie G. Rumbaoa</p>
                 </div>
             </div>
         </body>
@@ -217,14 +217,14 @@ class SupabaseEmailService
         <body>
             <div class='container'>
                 <div class='header'>
-                    <h1>📋 LPHS Enrollment Update</h1>
-                    <p>Lourdes Provincial High School</p>
+                    <h1>📋 CSCS Enrollment Update</h1>
+                    <p>Cauayan South Central School</p>
                 </div>
                 
                 <div class='content'>
                     <h2>Dear {$studentName},</h2>
                     
-                    <p>Thank you for your interest in enrolling at Lourdes Provincial High School.</p>
+                    <p>Thank you for your interest in enrolling at Cauayan South Central School.</p>
                     
                     <div class='notice'>
                         <h3>⚠️ Application Status Update</h3>
@@ -242,9 +242,81 @@ class SupabaseEmailService
                 </div>
                 
                 <div class='footer'>
-                    <p>Lourdes Provincial High School<br>
-                    Barangay Lourdes, Panglao Town, Bohol, Philippines<br>
-                    📞 +63 38 502 9000 | 📧 info@lphs.edu.ph</p>
+                    <p>Cauayan South Central School<br>
+                    Mabini Street, District I, Cauayan City, Isabela, Philippines<br>
+                    Plus Code: WQ8Q+J5V / WQJC+MM7, Cauayan City<br>
+                    Principal: Ronnie G. Rumbaoa</p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+    
+    public function sendPromotionEmail($toEmail, $studentName, $nextGradeLevel)
+    {
+        $subject = 'CSCS - Grade Promotion Approved for Next School Year';
+        $message = $this->getPromotionEmailTemplate($studentName, $nextGradeLevel);
+        $result = $this->sendEmail($toEmail, $subject, $message);
+        log_message('info', 'Promotion email processing completed for: ' . $toEmail);
+        return $result;
+    }
+    
+    private function getPromotionEmailTemplate($studentName, $nextGradeLevel)
+    {
+        helper('grade_level');
+        $nextGradeLabel = grade_level_label((int) $nextGradeLevel);
+
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #10b981; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; background: #f8f9fa; }
+                .button { background: #fbbf24; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+                .promotion-box { background: white; padding: 15px; border-left: 4px solid #10b981; margin: 15px 0; }
+                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🎉 Congratulations on Your Promotion!</h1>
+                    <p>Cauayan South Central School</p>
+                </div>
+                
+                <div class='content'>
+                    <h2>Dear {$studentName},</h2>
+                    
+                    <p>We are pleased to inform you that your application for next school year enrollment has been <strong>approved</strong>!</p>
+                    
+                    <div class='promotion-box'>
+                        <h3>✅ Promotion Details:</h3>
+                        <p><strong>Next Grade Level:</strong> {$nextGradeLabel}</p>
+                        <p><strong>Status:</strong> Approved</p>
+                    </div>
+                    
+                    <h3>📋 What's Next:</h3>
+                    <ul>
+                        <li>Your section assignment will be announced before the school year starts</li>
+                        <li>Watch for updates on enrollment schedules and requirements</li>
+                        <li>Prepare necessary documents for the new school year</li>
+                        <li>Check your student portal regularly for announcements</li>
+                    </ul>
+                    
+                    <a href='https://smslphs.site/login' class='button'>Login to Student Portal</a>
+                    
+                    <p>Congratulations on your academic progress! We look forward to seeing you in {$nextGradeLabel}.</p>
+                </div>
+                
+                <div class='footer'>
+                    <p>Cauayan South Central School<br>
+                    Mabini Street, District I, Cauayan City, Isabela, Philippines<br>
+                    Plus Code: WQ8Q+J5V / WQJC+MM7, Cauayan City<br>
+                    Principal: Ronnie G. Rumbaoa</p>
                 </div>
             </div>
         </body>

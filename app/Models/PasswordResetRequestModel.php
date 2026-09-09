@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -51,9 +50,8 @@ class PasswordResetRequestModel extends Model
      */
     public function getAllRequestsWithDetails()
     {
-        return $this->select('password_reset_requests.*, auth_identities.secret as user_email, students.first_name, students.last_name, students.lrn as student_id')
+        return $this->select('password_reset_requests.*, password_reset_requests.email as user_email, students.first_name, students.last_name, students.lrn as student_id')
             ->join('users', 'users.id = password_reset_requests.user_id')
-            ->join('auth_identities', 'auth_identities.user_id = users.id AND auth_identities.type = "email_password"', 'left')
             ->join('students', 'students.user_id = users.id', 'left')
             ->orderBy('password_reset_requests.created_at', 'DESC')
             ->findAll();

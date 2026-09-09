@@ -4,9 +4,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3">Manage Students</h1>
   <div>
-    <a href="<?= base_url('admin/students/archived') ?>" class="btn btn-outline-info me-2">
-      <i class="bi bi-archive"></i> Archived Students
-    </a>
     <a href="<?= base_url('admin/students/enroll') ?>" class="btn btn-primary me-2">
       <i class="bi bi-plus-circle"></i> Enroll Student
     </a>
@@ -14,27 +11,35 @@
   </div>
 </div>
 
-<form class="row g-2 mb-3" method="get">
+<form class="row g-2 mb-3" method="get" id="filterForm" action="<?= base_url('admin/students') ?>">
   <div class="col-auto">
     <label class="form-label">Grade</label>
-    <select name="grade" class="form-select" onchange="this.form.submit()">
+    <select name="grade" class="form-select">
       <option value="">All</option>
-      <?php for ($g=7; $g<=12; $g++): ?>
-        <option value="<?= $g ?>" <?= ($gradeLevel==$g?'selected':'') ?>>Grade <?= $g ?></option>
-      <?php endfor; ?>
+      <?php foreach (grade_level_options() as $g): ?>
+        <option value="<?= $g ?>" <?= ($gradeLevel==$g?'selected':'') ?>><?= esc(grade_level_label($g)) ?></option>
+      <?php endforeach; ?>
     </select>
   </div>
   <div class="col-auto">
     <label class="form-label">Section</label>
-    <select name="section" class="form-select" onchange="this.form.submit()">
+    <select name="section" class="form-select">
       <option value="">All Sections</option>
       <?php if (!empty($allSections)): ?>
         <?php foreach ($allSections as $sec): ?>
           <option value="<?= $sec['id'] ?>" <?= ($section == $sec['id'] ? 'selected' : '') ?>>
-            <?= esc($sec['section_name']) ?> (Grade <?= $sec['grade_level'] ?>)
+            <?= esc($sec['section_name']) ?> (<?= esc(grade_level_label((int) $sec['grade_level'])) ?>)
           </option>
         <?php endforeach; ?>
       <?php endif; ?>
+    </select>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Assignment</label>
+    <select name="assignment" class="form-select">
+      <option value="">All Students</option>
+      <option value="assigned" <?= ($assignment ?? '') == 'assigned' ? 'selected' : '' ?>>Assigned</option>
+      <option value="unassigned" <?= ($assignment ?? '') == 'unassigned' ? 'selected' : '' ?>>Unassigned</option>
     </select>
   </div>
   <div class="col-auto">
@@ -42,7 +47,8 @@
     <input type="text" name="search" class="form-control" value="<?= esc($search) ?>" placeholder="Name or LRN">
   </div>
   <div class="col-auto align-self-end">
-    <button class="btn btn-primary">Filter</button>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="<?= base_url('admin/students') ?>" class="btn btn-outline-secondary">Clear</a>
     <button type="button" class="btn btn-outline-info ms-2" onclick="showEmergencyContacts()">
       <i class="bi bi-person-lines-fill"></i> Emergency Contacts
     </button>
@@ -69,7 +75,9 @@
               <tr>
                 <td><?= esc($st['lrn'] ?? '—') ?></td>
                 <td><?= esc($st['first_name'].' '.$st['last_name']) ?></td>
-                <td>Grade <?= esc($st['grade_level']) ?></td>
+                <td>
+                  <?= esc(grade_level_label((int) ($st['grade_level'] ?? 0))) ?>
+                </td>
                 <td>
                   <?php if (empty($st['section_name'])): ?>
                     <span class="text-danger">
@@ -91,12 +99,12 @@
                     <button class="btn btn-sm btn-outline-primary" onclick="viewStudent(<?= $st['id'] ?>)" title="View Details">
                       <i class="bi bi-eye"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="editStudent(<?= $st['id'] ?>)" title="Edit Student">
+                    <a href="<?= base_url('admin/students/edit/' . $st['id']) ?>" class="btn btn-sm btn-outline-warning" title="Edit Student">
                       <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="archiveStudent(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name']) ?>')" title="Archive Student">
-                      <i class="bi bi-archive"></i>
-                    </button>
+                    </a>
+<button class="btn btn-sm btn-danger" title="Delete Student" onclick="showDeleteConfirmation(<?= $st['id'] ?>, '<?= esc($st['first_name'] . ' ' . $st['last_name'], 'js') ?>')">
+  <i class="bi bi-trash"></i>
+</button>
                   </div>
                 </td>
               </tr>
@@ -105,16 +113,65 @@
         </table>
       </div>
     <?php else: ?>
-      <div class="p-4 text-center text-muted">No enrolled students found.</div>
+      <div class="p-4 text-center text-muted">
+        <?php if ($gradeLevel || $section || $search): ?>
+          No students found matching the selected filters.
+        <?php else: ?>
+          No enrolled students found.
+        <?php endif; ?>
+      </div>
     <?php endif; ?>
+  </div>
+  
+  <div class="card-footer">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-muted small">
+        <?php if (isset($totalStudents) && $totalStudents > 0): ?>
+          Showing <?= ($currentPage - 1) * $perPage + 1 ?> to <?= min($currentPage * $perPage, $totalStudents) ?> of <?= $totalStudents ?> students
+        <?php else: ?>
+          No students found
+        <?php endif; ?>
+      </div>
+      <?php if (isset($totalPages) && $totalPages > 1): ?>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <?php if ($currentPage > 1): ?>
+              <li class="page-item">
+                <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $currentPage - 1])) ?>">
+                  <i class="bi bi-chevron-left"></i> Previous
+                </a>
+              </li>
+            <?php endif; ?>
+            
+            <?php 
+            $startPage = max(1, $currentPage - 2);
+            $endPage = min($totalPages, $currentPage + 2);
+            for ($i = $startPage; $i <= $endPage; $i++): 
+            ?>
+              <li class="page-item <?= $i == $currentPage ? 'active' : '' ?>">
+                <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>"><?= $i ?></a>
+              </li>
+            <?php endfor; ?>
+            
+            <?php if ($currentPage < $totalPages): ?>
+              <li class="page-item">
+                <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['page' => $currentPage + 1])) ?>">
+                  Next <i class="bi bi-chevron-right"></i>
+                </a>
+              </li>
+            <?php endif; ?>
+          </ul>
+        </nav>
+      <?php endif; ?>
+    </div>
   </div>
 </div>
 
 <!-- Custom Student Details Modal -->
-<div id="customStudentModal" class="custom-modal-overlay" style="display: none;">
+<div id="customStudentModal" class="custom-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="customStudentModalLabel">
   <div class="custom-modal-container">
     <div class="custom-modal-header">
-      <h3 class="custom-modal-title">Student Details</h3>
+      <h3 class="custom-modal-title" id="customStudentModalLabel">Student Details</h3>
       <button type="button" class="custom-modal-close" onclick="closeStudentModal()">
         <i class="bi bi-x-lg"></i>
       </button>
@@ -150,7 +207,7 @@
 </div>
 
 <!-- Emergency Contacts Modal -->
-<div id="emergencyContactsModal" class="custom-modal-overlay" style="display: none;">
+<div id="emergencyContactsModal" class="custom-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="emergencyContactsModalLabel">
   <div class="custom-modal-container">
     <div class="custom-modal-header">
       <h3 class="custom-modal-title">Emergency Contacts</h3>
@@ -159,6 +216,9 @@
       </button>
     </div>
     <div class="custom-modal-body">
+      <div class="mb-3">
+        <input type="text" id="emergencyContactSearch" class="form-control" placeholder="Search by LRN or student name..." oninput="filterEmergencyContacts()">
+      </div>
       <div id="emergencyContactsList">
         <div class="loading-spinner">
           <div class="spinner"></div>
@@ -194,6 +254,7 @@
                 <option value="">Select Type</option>
                 <option value="New Student">New Student</option>
                 <option value="Transferee">Transferee</option>
+                <option value="Old Student">Old Student</option>
               </select>
             </div>
           </div>
@@ -223,12 +284,9 @@
             <div class="mb-3">
               <label class="form-label">Grade Level</label>
               <select class="form-select" name="grade_level" id="editGradeLevel" required>
-                <option value="7">Grade 7</option>
-                <option value="8">Grade 8</option>
-                <option value="9">Grade 9</option>
-                <option value="10">Grade 10</option>
-                <option value="11">Grade 11</option>
-                <option value="12">Grade 12</option>
+                <?php foreach (grade_level_options() as $g): ?>
+                  <option value="<?= $g ?>"><?= esc(grade_level_label($g)) ?></option>
+                <?php endforeach; ?>
               </select>
             </div>
           </div>
@@ -552,6 +610,38 @@
 // Store student data for quick access
 const studentsData = <?= json_encode($students) ?>;
 
+// Filter form functions
+function submitFilter() {
+  const form = document.getElementById('filterForm');
+  form.submit();
+}
+
+function clearFilters() {
+  window.location.href = '<?= base_url('admin/students') ?>';
+}
+
+function filterByGrade(grade) {
+  const url = new URL(window.location);
+  if (grade) {
+    url.searchParams.set('grade', grade);
+  } else {
+    url.searchParams.delete('grade');
+  }
+  url.searchParams.delete('page'); // Reset to first page
+  window.location.href = url.toString();
+}
+
+function filterBySection(section) {
+  const url = new URL(window.location);
+  if (section) {
+    url.searchParams.set('section', section);
+  } else {
+    url.searchParams.delete('section');
+  }
+  url.searchParams.delete('page'); // Reset to first page
+  window.location.href = url.toString();
+}
+
 // View student details in full page
 function viewStudent(studentId) {
   window.location.href = `<?= base_url('admin/students/view/') ?>${studentId}`;
@@ -682,7 +772,7 @@ function loadBasicStudentDetails(student, detailsContainer) {
             Academic Information
           </div>
           <table class="student-info-table">
-            <tr><td>Grade Level:</td><td>Grade ${student.grade_level}</td></tr>
+            <tr><td>Grade Level:</td><td>${formatGradeLevel(student.grade_level)}</td></tr>
             <tr><td>Section:</td><td>${student.section_name || 'Not assigned'}</td></tr>
             <tr><td>School Year:</td><td>${student.school_year || 'N/A'}</td></tr>
             <tr><td>Status:</td><td><span class="badge bg-success">Enrolled</span></td></tr>
@@ -779,6 +869,33 @@ function closeDocumentModal() {
 document.addEventListener('DOMContentLoaded', function() {
   const modal = document.getElementById('customStudentModal');
 
+  // Delegated archive confirmation with explicit confirmation step
+  document.addEventListener('click', function(e) {
+    const archiveBtn = e.target.closest('button[data-archive-id]');
+    if (!archiveBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const studentId = archiveBtn.getAttribute('data-archive-id');
+    const studentName = archiveBtn.getAttribute('data-archive-name') || 'this student';
+    if (typeof showArchiveConfirmation === 'function') {
+      showArchiveConfirmation(studentId, studentName);
+    } else if (typeof showConfirmModal === 'function') {
+      showConfirmModal({
+        title: 'Confirm Archive',
+        message: 'Are you sure you want to archive "' + studentName + '"? This can be reversed later.',
+        confirmText: 'Yes, archive',
+        cancelText: 'Cancel',
+        onConfirm: function () {
+          if (typeof confirmArchiveStudent === 'function') {
+            confirmArchiveStudent(studentId);
+          }
+        }
+      });
+    } else {
+      alert('Archive functionality requires confirmation. Please enable modal support.');
+    }
+  });
+
   // Event delegation for clickable documents
   document.addEventListener('click', function(e) {
     if (e.target.classList.contains('clickable-document') || e.target.closest('.clickable-document')) {
@@ -866,16 +983,16 @@ function loadEmergencyContacts() {
   
   // Generate emergency contacts list from students data
   let contactsHtml = '<div class="table-responsive">';
-  contactsHtml += '<table class="table table-striped">';
+  contactsHtml += '<table class="table table-striped" id="emergencyContactsTable">';
   contactsHtml += '<thead><tr><th>Student</th><th>Emergency Contact</th></tr></thead>';
   contactsHtml += '<tbody>';
   
   studentsData.forEach(student => {
     contactsHtml += `
-      <tr>
+      <tr data-lrn="${student.lrn || ''}" data-name="${student.first_name} ${student.last_name}">
         <td>
           <strong>${student.first_name} ${student.last_name}</strong><br>
-          <small class="text-muted">${student.lrn || 'N/A'} - Grade ${student.grade_level}</small>
+          <small class="text-muted">${student.lrn || 'N/A'} - ${formatGradeLevel(student.grade_level)}</small>
         </td>
         <td>
           <strong>Name:</strong> ${student.emergency_contact_name || 'N/A'}<br>
@@ -895,69 +1012,45 @@ function loadEmergencyContacts() {
   contactsList.innerHTML = contactsHtml;
 }
 
-// Edit Student Modal Functions
-function editStudent(studentId) {
-  const student = studentsData.find(s => s.id == studentId);
-  if (!student) {
-    alert('Student not found.');
-    return;
-  }
+function filterEmergencyContacts() {
+  const searchInput = document.getElementById('emergencyContactSearch');
+  const searchTerm = searchInput.value.toLowerCase().trim();
+  const table = document.getElementById('emergencyContactsTable');
   
-  // Populate form fields
-  document.getElementById('editLrn').value = student.lrn || '';
-  document.getElementById('editStudentType').value = student.student_type || '';
-  document.getElementById('editEmail').value = student.email || '';
-  document.getElementById('editFirstName').value = student.first_name || '';
-  document.getElementById('editLastName').value = student.last_name || '';
-  document.getElementById('editGradeLevel').value = student.grade_level || '7';
-  document.getElementById('editGender').value = student.gender || 'Male';
-  document.getElementById('editStatus').value = student.enrollment_status || 'enrolled';
-  document.getElementById('editContactNumber').value = student.contact_number || '';
-  document.getElementById('editAddress').value = student.address || '';
+  if (!table) return;
   
-  // Store student ID for saving
-  document.getElementById('editStudentForm').dataset.studentId = studentId;
+  const rows = table.querySelectorAll('tbody tr');
+  let visibleCount = 0;
   
-  // Show modal
-  const footer = document.querySelector('.modern-footer');
-  if (footer) footer.style.display = 'none';
-  document.getElementById('editStudentModal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-
-function closeEditStudentModal() {
-  const footer = document.querySelector('.modern-footer');
-  
-  document.getElementById('editStudentModal').style.display = 'none';
-  if (footer) footer.style.display = 'block';
-  document.body.style.overflow = '';
-}
-
-function saveStudent() {
-  const form = document.getElementById('editStudentForm');
-  const studentId = form.dataset.studentId;
-  const formData = new FormData(form);
-  
-  fetch(`<?= base_url('admin/students/update') ?>/${studentId}`, {
-    method: 'POST',
-    body: formData,
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      alert('Student updated successfully!');
-      location.reload();
+  rows.forEach(row => {
+    const lrn = (row.getAttribute('data-lrn') || '').toLowerCase();
+    const name = (row.getAttribute('data-name') || '').toLowerCase();
+    const contactInfo = row.querySelector('td:last-child').textContent.toLowerCase();
+    
+    if (lrn.includes(searchTerm) || name.includes(searchTerm) || contactInfo.includes(searchTerm)) {
+      row.style.display = '';
+      visibleCount++;
     } else {
-      alert('Error: ' + (data.error || 'Failed to update student'));
+      row.style.display = 'none';
     }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    alert('Failed to update student');
   });
+  
+  // Show no results message if needed
+  const existingNoResults = document.getElementById('noResultsMessage');
+  if (existingNoResults) existingNoResults.remove();
+  
+  if (visibleCount === 0 && searchTerm !== '') {
+    const noResultsMsg = document.createElement('div');
+    noResultsMsg.id = 'noResultsMessage';
+    noResultsMsg.className = 'alert alert-warning mt-3';
+    noResultsMsg.innerHTML = '<i class="bi bi-search"></i> No students found matching your search.';
+    document.getElementById('emergencyContactsList').appendChild(noResultsMsg);
+  }
+}
+
+// Edit Student - redirect to edit page
+function editStudent(studentId) {
+  window.location.href = `<?= base_url('admin/students/edit/') ?>${studentId}`;
 }
 
 // Enroll Student Modal Functions
@@ -1028,7 +1121,15 @@ function buildEnrollStudentModal() {
             <div class="col-md-3">
               <div class="mb-3">
                 <label class="form-label">Suffix</label>
-                <input type="text" class="form-control" name="suffix" placeholder="Jr., Sr., III">
+                <select class="form-select" name="suffix">
+                  <option value="">None</option>
+                  <option value="Jr.">Jr.</option>
+                  <option value="Sr.">Sr.</option>
+                  <option value="II">II</option>
+                  <option value="III">III</option>
+                  <option value="IV">IV</option>
+                  <option value="V">V</option>
+                </select>
               </div>
             </div>
           </div>
@@ -1084,12 +1185,9 @@ function buildEnrollStudentModal() {
                 <label class="form-label">Grade Level *</label>
                 <select class="form-select" name="grade_level" required>
                   <option value="">Select Grade</option>
-                  <option value="7">Grade 7</option>
-                  <option value="8">Grade 8</option>
-                  <option value="9">Grade 9</option>
-                  <option value="10">Grade 10</option>
-                  <option value="11">Grade 11</option>
-                  <option value="12">Grade 12</option>
+                  <?php foreach (grade_level_options() as $g): ?>
+                    <option value="<?= $g ?>"><?= esc(grade_level_label($g)) ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
             </div>
@@ -1100,6 +1198,7 @@ function buildEnrollStudentModal() {
                   <option value="">Select Type</option>
                   <option value="New Student">New Student</option>
                   <option value="Transferee">Transferee</option>
+                  <option value="Old Student">Old Student</option>
                 </select>
               </div>
             </div>
@@ -1271,8 +1370,8 @@ function fillDemoData() {
   const lastNames = ['Dela Cruz', 'Santos', 'Garcia', 'Reyes', 'Lopez', 'Martinez', 'Gonzalez', 'Rodriguez', 'Fernandez', 'Morales', 'Jimenez', 'Herrera', 'Medina', 'Castro', 'Ortiz'];
   const suffixes = ['', '', '', 'Jr.', 'Sr.', 'III', ''];
   const genders = ['Male', 'Female'];
-  const gradeLevels = ['7', '8', '9', '10', '11', '12'];
-  const studentTypes = ['New Student', 'Transferee'];
+  const gradeLevels = <?= json_encode(array_map('strval', grade_level_options())) ?>;
+  const studentTypes = ['New Student', 'Transferee', 'Old Student'];
   const places = ['Tagbilaran City, Bohol', 'Panglao, Bohol', 'Dauis, Bohol', 'Baclayon, Bohol', 'Loboc, Bohol', 'Carmen, Bohol', 'Tubigon, Bohol'];
   const religions = ['Catholic', 'Protestant', 'Iglesia ni Cristo', 'Baptist', 'Methodist', 'Born Again', 'Seventh-day Adventist'];
   const relationships = ['Mother', 'Father', 'Guardian', 'Aunt', 'Uncle', 'Grandmother', 'Grandfather'];
@@ -1283,7 +1382,7 @@ function fillDemoData() {
   const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const getRandomBirthDate = () => {
     const today = new Date();
-    const age = Math.floor(Math.random() * 7) + 11;
+    const age = Math.floor(Math.random() * 7) + 6;
     const birthYear = today.getFullYear() - age;
     const birthMonth = Math.floor(Math.random() * 12) + 1;
     const birthDay = Math.floor(Math.random() * 28) + 1;
@@ -1338,29 +1437,225 @@ function fillDemoData() {
 
 // Archive student function
 function archiveStudent(studentId, studentName) {
-  if (confirm(`Are you sure you want to archive student "${studentName}"? They will be moved to archived students.`)) {
-    fetch(`<?= base_url('admin/students/archive') ?>/${studentId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        alert(data.message);
-        location.reload();
-      } else {
-        alert('Error: ' + data.error);
-      }
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      alert('Failed to archive student');
-    });
-  }
+  showArchiveConfirmation(studentId, studentName);
 }
+
+// Restore student function
+function restoreStudent(studentId, studentName) {
+  showRestoreConfirmation(studentId, studentName);
+}
+
+function getDashboardModalPortal() {
+  return document.getElementById('dashboard-modal-portal') || document.body;
+}
+
+function createDashboardModal(id, title, bodyHtml, confirmButtonId, confirmButtonClass, confirmButtonText) {
+  const existing = document.getElementById(id);
+  if (existing) existing.remove();
+
+  const modalHtml = `
+  <div class="modal fade" id="${id}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">${title}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          ${bodyHtml}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="background-color: darkgray; border-color: darkgray;">Cancel</button>
+          <button type="button" class="btn ${confirmButtonClass}" id="${confirmButtonId}">${confirmButtonText}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  getDashboardModalPortal().insertAdjacentHTML('beforeend', modalHtml);
+  return document.getElementById(id);
+}
+
+function showArchiveConfirmation(studentId, studentName) {
+  const modalEl = createDashboardModal(
+    'archiveConfirmModal',
+    'Confirm Action',
+    `
+      <div class="alert alert-warning border-0">
+        <i class="bi bi-question-circle fs-2 mb-2 d-block text-center"></i>
+        <p class="text-center mb-0">Are you sure you want to archive student "${studentName}"? They will be moved to archived students.</p>
+      </div>
+    `,
+    'confirmArchiveBtn',
+    'btn-primary',
+    'Confirm'
+  );
+
+  const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true, focus: true });
+  const confirmBtn = modalEl.querySelector('#confirmArchiveBtn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', function () {
+      confirmArchiveStudent(studentId);
+    }, { once: true });
+  }
+  modal.show();
+}
+
+function confirmArchiveStudent(studentId) {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('archiveConfirmModal'));
+  if (modal) modal.hide();
+  
+  fetch(`<?= base_url('admin/students/archive') ?>/${studentId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showArchiveAlert(data.message);
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showArchiveAlert('Error: ' + data.error, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showArchiveAlert('Failed to archive student', 'error');
+  });
+}
+
+function showDeleteConfirmation(studentId, studentName) {
+  const modalEl = createDashboardModal(
+    'deleteConfirmModal',
+    'Confirm Permanent Delete',
+    `
+      <div class="alert alert-danger border-0">
+        <i class="bi bi-exclamation-triangle fs-2 mb-2 d-block text-center"></i>
+        <p class="text-center mb-0">Are you sure you want to PERMANENTLY DELETE student "${studentName}"? This cannot be undone.</p>
+      </div>
+    `,
+    'confirmDeleteBtn',
+    'btn-danger',
+    'Yes, Delete'
+  );
+
+  const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true, focus: true });
+  const confirmBtn = modalEl.querySelector('#confirmDeleteBtn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', function () {
+      confirmDeleteStudent(studentId);
+    }, { once: true });
+  }
+  modal.show();
+}
+
+function confirmDeleteStudent(studentId) {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+  if (modal) modal.hide();
+
+  fetch(`<?= base_url('admin/students/delete-permanently') ?>/${studentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showArchiveAlert('Student permanently deleted.');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      showArchiveAlert('Error: ' + (data.error || 'Failed to delete student'), 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showArchiveAlert('Failed to delete student', 'error');
+  });
+}
+
+function showRestoreConfirmation(studentId, studentName) {
+  const modalEl = createDashboardModal(
+    'restoreConfirmModal',
+    'Confirm Restore',
+    `
+      <div class="alert alert-success border-0">
+        <i class="bi bi-arrow-counterclockwise fs-2 mb-2 d-block text-center"></i>
+        <p class="text-center mb-0">Are you sure you want to restore student "${studentName}" to active status?</p>
+      </div>
+    `,
+    'confirmRestoreBtn',
+    'btn-success',
+    'Restore'
+  );
+
+  const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true, focus: true });
+  const confirmBtn = modalEl.querySelector('#confirmRestoreBtn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', function () {
+      confirmRestoreStudent(studentId);
+    }, { once: true });
+  }
+  modal.show();
+}
+
+function confirmRestoreStudent(studentId) {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('restoreConfirmModal'));
+  if (modal) modal.hide();
+  
+  fetch(`<?= base_url('admin/students/restore') ?>/${studentId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showArchiveAlert(data.message);
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showArchiveAlert('Error: ' + (data.error || 'Failed to restore student'), 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showArchiveAlert('Failed to restore student', 'error');
+  });
+}
+
+function showArchiveAlert(message, type = 'success') {
+  const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+  const iconClass = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-triangle';
+  
+  const modalEl = createDashboardModal(
+    'archiveAlertModal',
+    'Alert',
+    `
+      <div class="${alertClass} border-0 mb-3">
+        <i class="${iconClass} fs-2 mb-2"></i>
+        <p class="mb-0">${message}</p>
+      </div>
+    `,
+    'archiveAlertOkBtn',
+    'btn-primary',
+    'OK'
+  );
+
+  const okBtn = modalEl.querySelector('#archiveAlertOkBtn');
+  if (okBtn) {
+    okBtn.setAttribute('data-bs-dismiss', 'modal');
+  }
+
+  const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true, focus: true });
+  modal.show();
+}
+
 </script>
 
 <?= $this->endSection() ?>

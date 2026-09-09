@@ -95,8 +95,16 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3 analytics-header">
   <div>
-    <h1 class="h5 mb-0"><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Analytics</h1>
-    <small class="text-muted">Grade <?= isset($teacherSection) ? esc($teacherSection['grade_level']) : 'N/A' ?> - <?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Performance Overview</small>
+    <h1 class="h5 mb-0">Class Analytics</h1>
+    <small class="text-muted">
+      <?php if ((int) ($analyticsSectionCount ?? 0) > 1): ?>
+        <?= (int) $analyticsSectionCount ?> sections (advisory + scheduled) · School year <?= esc($schoolYear ?? '') ?> · T<?= esc((string) ($currentTerm ?? '')) ?>
+      <?php elseif (isset($teacherSection) && $teacherSection): ?>
+        <?= esc(grade_level_label((int) $teacherSection['grade_level'])) ?> · <?= esc($teacherSection['section_name']) ?> · <?= esc($schoolYear ?? '') ?> · T<?= esc((string) ($currentTerm ?? '')) ?>
+      <?php else: ?>
+        Your classes · <?= esc($schoolYear ?? '') ?> · T<?= esc((string) ($currentTerm ?? '')) ?>
+      <?php endif; ?>
+    </small>
   </div>
   <div class="d-flex gap-2">
     <a href="<?= base_url('teacher/analytics/export-pdf') ?>" class="btn btn-sm btn-primary" target="_blank">
@@ -126,8 +134,8 @@
     <i class="bi bi-graph-up fs-1 text-muted mb-3"></i>
     <h5 class="text-muted">No Analytics Data Available</h5>
     <p class="text-muted mb-0">
-      You are not currently assigned as an adviser to any section with enrolled students.<br>
-      Analytics will be available once you have students assigned to your advisory class.
+      No enrolled students were found in sections where you are adviser or on your teaching schedule for the current school year.<br>
+      Analytics will appear once scheduling and enrollments are set.
     </p>
     <div class="mt-3">
       <a href="<?= base_url('teacher/dashboard') ?>" class="btn btn-outline-primary">
@@ -142,8 +150,14 @@
   <div class="card overview-card mb-3">
     <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
       <div class="d-flex align-items-center gap-2">
-        <h6 class="mb-0"><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Overview</h6>
-        <small class="text-muted">Grade <?= isset($teacherSection) ? esc($teacherSection['grade_level']) : 'N/A' ?> - <?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> performance snapshot</small>
+        <h6 class="mb-0">Class overview</h6>
+        <small class="text-muted">
+          <?php if ((int) ($analyticsSectionCount ?? 0) > 1): ?>
+            <?= (int) $analyticsSectionCount ?> sections · <?= (int) ($analytics['studentsGradedForDistribution'] ?? 0) ?> with grades this term
+          <?php else: ?>
+            <?= isset($teacherSection) && $teacherSection ? esc($teacherSection['section_name']) . ' · ' : '' ?>snapshot
+          <?php endif; ?>
+        </small>
       </div>
       <div class="stat-chips">
         <span class="stat-chip bg-primary-soft">Total <strong><?= $totalStudents ?></strong></span>
@@ -160,10 +174,11 @@
       <div class="charts-grid">
         <div class="card chart-card">
           <div class="card-header d-flex justify-content-between align-items-center py-2">
-            <strong class="small"><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Grade Distribution</strong>
-            <small class="text-muted d-none d-md-inline"><?= $totalStudents ?> Students</small>
+            <strong class="small">Grade distribution</strong>
+            <small class="text-muted d-none d-md-inline" title="Per-student average this term across listed subjects"><?= (int) ($analytics['studentsGradedForDistribution'] ?? 0) ?> with grades</small>
           </div>
           <div class="card-body py-2">
+            <p class="small text-muted mb-2">Buckets count students by their <strong>average</strong> this term (subjects in scope).</p>
             <div class="row mb-2">
               <div class="col-4">
                 <div class="text-center">
@@ -197,8 +212,8 @@
         </div>
         <div class="card chart-card">
           <div class="card-header d-flex justify-content-between align-items-center py-2">
-            <strong class="small"><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Trends</strong>
-            <small class="text-muted d-none d-md-inline">Q1 Progress</small>
+            <strong class="small">Term trends (class mean)</strong>
+            <small class="text-muted d-none d-md-inline">All terms · <?= esc($schoolYear ?? '') ?></small>
           </div>
           <div class="card-body py-2">
             <div class="row mb-2">
@@ -217,7 +232,7 @@
             </div>
             <div class="chart-container">
               <?php if ($totalStudents > 0): ?>
-                <canvas id="quarterTrendsChart" class="chart-canvas"></canvas>
+                <canvas id="termTrendsChart" class="chart-canvas"></canvas>
               <?php else: ?>
                 <div class="d-flex align-items-center justify-content-center h-100">
                   <small class="text-muted">No students enrolled</small>
@@ -229,7 +244,7 @@
         <div class="card chart-card">
           <div class="card-header d-flex justify-content-between align-items-center py-2">
             <strong class="small"><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Performance Trends</strong>
-            <small class="text-muted d-none d-md-inline">Grade <?= isset($teacherSection) ? esc($teacherSection['grade_level']) : 'N/A' ?></small>
+            <small class="text-muted d-none d-md-inline"><?= isset($teacherSection) ? esc(grade_level_label((int) $teacherSection['grade_level'])) : 'N/A' ?></small>
           </div>
           <div class="card-body py-2">
             <div class="row mb-2">
@@ -305,7 +320,7 @@
         <div class="card-body py-2">
           <div class="metric-row"><span>Section Average</span><strong><?= $totalStudents > 0 ? number_format($classAverage, 1) . '%' : 'N/A' ?></strong></div>
           <div class="metric-row"><span>Attendance Rate</span><strong><?= $totalStudents > 0 ? number_format($attendanceRate, 1) . '%' : 'N/A' ?></strong></div>
-          <div class="metric-row"><span>Quarter Growth</span><strong><?= $totalStudents > 0 ? '+' . number_format($improvementRate, 1) . '%' : 'N/A' ?></strong></div>
+          <div class="metric-row"><span>Term Growth</span><strong><?= $totalStudents > 0 ? '+' . number_format($improvementRate, 1) . '%' : 'N/A' ?></strong></div>
           <div class="metric-row mb-0"><span><?= isset($teacherSection) ? esc($teacherSection['section_name']) : 'Section' ?> Students</span><strong><?= $totalStudents ?></strong></div>
         </div>
       </div>
@@ -328,7 +343,7 @@
               <strong>-</strong>
             </div>
           <?php endif; ?>
-          <small class="text-muted d-block mt-1 small">SY: <?= $schoolYear ?? '2025-2026' ?></small>
+          <small class="text-muted d-block mt-1 small">SY: <?= $schoolYear ?? get_current_school_year() ?></small>
         </div>
       </div>
 
@@ -356,6 +371,7 @@
               <span>Attendance Rate</span>
               <strong><?= number_format($analytics['attendanceStats']['attendanceRate'] ?? 0, 1) ?>%</strong>
             </div>
+            <small class="text-muted d-block">Rate counts present and late as attended.</small>
           <?php else: ?>
             <div class="metric-row mb-0">
               <span class="text-muted small">No attendance data</span>
@@ -379,12 +395,12 @@
 <script>
 // Chart data from PHP
 const gradeDistribution = <?= json_encode($analytics['gradeDistribution'] ?? []) ?>;
-const quarterTrends = <?= json_encode($analytics['quarterTrends'] ?? []) ?>;
+const termTrends = <?= json_encode($analytics['termTrends'] ?? []) ?>;
 const subjectAverages = <?= json_encode($analytics['subjectAverages'] ?? []) ?>;
 const attendanceStats = <?= json_encode($analytics['attendanceStats'] ?? []) ?>;
 const analytics = <?= json_encode($analytics ?? []) ?>;
-const schoolYear = '<?= $schoolYear ?? '2025-2026' ?>';
-const currentQuarter = '<?= $currentQuarter ?? '1' ?>';
+const schoolYear = '<?= $schoolYear ?? get_current_school_year() ?>';
+const currentTerm = '<?= $currentTerm ?? '1' ?>';
 
 // Grade Distribution Doughnut Chart
 function initGradeDistributionChart() {
@@ -458,13 +474,12 @@ function initGradeDistributionChart() {
   });
 }
 
-// Quarter Trends Line Chart
-function initQuarterTrendsChart() {
-  const ctx = document.getElementById('quarterTrendsChart').getContext('2d');
-  
-  const hasData = quarterTrends.some(q => q.average > 0);
-  
-  // If no data, show placeholder
+// Term Trends Line Chart
+function initTermTrendsChart() {
+  const ctx = document.getElementById('termTrendsChart').getContext('2d');
+
+  const hasData = termTrends.some(t => t.average > 0);
+
   if (!hasData) {
     ctx.font = '14px Arial';
     ctx.fillStyle = '#6b7280';
@@ -476,10 +491,10 @@ function initQuarterTrendsChart() {
   new Chart(ctx, {
     type: 'line',
     data: {
-      labels: quarterTrends.map(q => q.quarter),
+      labels: termTrends.map(t => t.term),
       datasets: [{
         label: 'Class Average',
-        data: quarterTrends.map(q => q.average),
+        data: termTrends.map(t => t.average),
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 3,
@@ -535,8 +550,8 @@ function exportAnalytics() {
   // Create a simple text report
   let report = 'CLASS ANALYTICS REPORT\n';
   report += '======================\n\n';
-  report += 'School Year: ' + (schoolYear || '2024-2025') + '\n';
-  report += 'Quarter: ' + (currentQuarter || '1') + '\n';
+  report += 'School Year: ' + (schoolYear || '<?= get_current_school_year() ?>') + '\n';
+  report += 'Term: ' + (currentTerm || '1') + '\n';
   report += 'Generated: ' + new Date().toLocaleDateString() + '\n\n';
 
   report += 'SUMMARY STATISTICS:\n';
@@ -620,11 +635,10 @@ function initAttendanceChart() {
 function initPerformanceChart() {
   const ctx = document.getElementById('performanceChart').getContext('2d');
   
-  // Use actual quarter data instead of mock data
-  const quarterData = quarterTrends.map(q => q.average);
-  const quarterLabels = quarterTrends.map(q => q.quarter);
-  
-  const hasData = quarterData.some(avg => avg > 0);
+  const termData = termTrends.map(t => t.average);
+  const termLabels = termTrends.map(t => t.term);
+
+  const hasData = termData.some(avg => avg > 0);
   
   // If no data, show placeholder
   if (!hasData) {
@@ -638,10 +652,10 @@ function initPerformanceChart() {
   new Chart(ctx, {
     type: 'line',
     data: {
-      labels: quarterLabels,
+      labels: termLabels,
       datasets: [{
         label: 'Class Performance',
-        data: quarterData,
+        data: termData,
         borderColor: '#8b5cf6',
         backgroundColor: 'rgba(139, 92, 246, 0.1)',
         borderWidth: 3,
@@ -693,12 +707,11 @@ function sendToAdmin() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
+        'X-Requested-With': 'XMLHttpRequest',
+        '<?= config('Security')->headerName ?>': '<?= csrf_hash() ?>'
       },
       body: JSON.stringify({
-        analytics: analytics,
-        schoolYear: schoolYear,
-        currentQuarter: currentQuarter
+        '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
       })
     })
     .then(response => response.json())
@@ -722,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   if (totalStudents > 0) {
     initGradeDistributionChart();
-    initQuarterTrendsChart();
+    initTermTrendsChart();
     initAttendanceChart();
     initPerformanceChart();
   }

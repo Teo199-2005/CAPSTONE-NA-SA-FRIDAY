@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers\Student;
 
 use App\Controllers\BaseController;
@@ -35,21 +34,21 @@ class Dashboard extends BaseController
     protected function getPerformanceMessage($average)
     {
         if ($average === null) {
-            return ['message' => 'No grades yet', 'class' => 'bg-secondary text-white', 'icon' => '📊'];
+            return ['message' => 'No grades yet', 'class' => 'bg-secondary text-white', 'icon' => 'bi-clipboard-data'];
         }
 
         if ($average >= 95) {
-            return ['message' => '🏆 Outstanding!', 'class' => 'bg-success text-white', 'icon' => '🏆'];
+            return ['message' => 'Outstanding!', 'class' => 'bg-success text-white', 'icon' => 'bi-trophy-fill'];
         } elseif ($average >= 90) {
-            return ['message' => '⭐ Excellent work!', 'class' => 'bg-success text-white', 'icon' => '⭐'];
+            return ['message' => 'Excellent work!', 'class' => 'bg-success text-white', 'icon' => 'bi-star-fill'];
         } elseif ($average >= 85) {
-            return ['message' => '👍 Great work!', 'class' => 'bg-success text-white', 'icon' => '👍'];
+            return ['message' => 'Great work!', 'class' => 'bg-success text-white', 'icon' => 'bi-hand-thumbs-up-fill'];
         } elseif ($average >= 80) {
-            return ['message' => '✅ Good job!', 'class' => 'bg-info text-white', 'icon' => '✅'];
+            return ['message' => 'Good job!', 'class' => 'bg-info text-white', 'icon' => 'bi-check-circle-fill'];
         } elseif ($average >= 75) {
-            return ['message' => '📈 Keep improving!', 'class' => 'bg-warning text-white', 'icon' => '📈'];
+            return ['message' => 'Keep improving!', 'class' => 'bg-warning text-white', 'icon' => 'bi-graph-up-arrow'];
         } else {
-            return ['message' => '💪 Need more effort!', 'class' => 'bg-danger text-white', 'icon' => '💪'];
+            return ['message' => 'Need more effort!', 'class' => 'bg-danger text-white', 'icon' => 'bi-lightning-charge-fill'];
         }
     }
 
@@ -64,14 +63,6 @@ class Dashboard extends BaseController
             $authStatus = 'Auth error: ' . $e->getMessage();
         }
 
-        // Get recent announcements
-        $announcementModel = new AnnouncementModel();
-        $announcements = $announcementModel->where('target_roles', 'all')
-            ->orWhere('target_roles', 'student')
-            ->orderBy('published_at', 'DESC')
-            ->limit(3)
-            ->findAll();
-
         // Get recent notifications for current user
         $notificationModel = new NotificationModel();
         $notifications = $notificationModel->where('user_id', $this->auth->id() ?? 1)
@@ -85,71 +76,46 @@ class Dashboard extends BaseController
 
         // Try to get real student data if possible
         $student = null;
-        $quarterAverage = null;
-        $currentQuarter = $this->getCurrentQuarter();
-        $schoolYear = '2025-2026';
+        $termAverage = null;
+        $currentTerm = $this->getCurrentTerm();
+        $schoolYear = get_current_school_year();
 
         try {
             if ($this->auth->loggedIn() && $this->auth->user()->inGroup('student')) {
-                // Get real student data
                 $studentModel = new \App\Models\StudentModel();
                 $gradeModel = new \App\Models\GradeModel();
 
                 $student = $studentModel->where('user_id', $this->auth->id())->first();
 
                 if ($student) {
-                    // Calculate real quarter average
-                    $quarterAverage = $gradeModel->getQuarterAverage($student['id'], $schoolYear, $currentQuarter);
+                    $termAverage = $gradeModel->getTermAverage($student['id'], $schoolYear, $currentTerm);
                 }
             }
         } catch (\Throwable $e) {
             // Fall back to test data if there's an error
         }
 
-        // Use test data if no real student found - match teacher's Grade 7 class
+        // If no authenticated student, redirect to login
         if (!$student) {
-            $student = [
-                'id' => 1,
-                'first_name' => 'Demo',
-                'last_name' => 'Student',
-                'lrn' => '123456789001',
-                'grade_level' => 7,
-                'section_name' => 'Aphrodite',
-                'enrollment_status' => 'enrolled',
-                'email' => 'demo.student@example.com',
-                'contact_number' => '+63 912 345 6789',
-                'address' => '123 Test Street, Test City',
-                'emergency_contact_name' => 'Test Parent',
-                'emergency_contact_number' => '+63 998 765 4321',
-                'emergency_contact_relationship' => 'Parent'
-            ];
-            // Use sample data if no real grades
-            if ($quarterAverage === null) {
-                $quarterAverage = null; // No grades yet
-            }
+            return redirect()->to(base_url('login'));
         }
 
-        // Return a simple test view with auth status
+        // Featured poster for student dashboard
+        helper('asset');
+        $studentPoster = featured_dashboard_poster('student');
+
         return view('student/dashboard', [
-            'title' => 'Student Dashboard - LPHS SMS (Test Mode)',
+            'title' => 'Student Dashboard - CSCS SMS',
             'student' => $student,
-            'announcements' => $announcements,
             'notifications' => $notifications,
             'unreadCount' => $unreadCount,
             'recentGrades' => [],
-            'quarterAverage' => $quarterAverage,
-            'currentQuarter' => $currentQuarter,
-            'performanceMessage' => $this->getPerformanceMessage($quarterAverage),
-            'debug_info' => [
-                'auth_status' => $authStatus,
-                'timestamp' => date('Y-m-d H:i:s'),
-                'session_id' => session_id(),
-                'real_data' => $student['id'] !== 1 ? 'Yes' : 'No',
-                'quarter_average' => $quarterAverage,
-                'current_quarter' => $currentQuarter,
-                'school_year' => $schoolYear,
-                'student_id' => $student['id'] ?? 'N/A'
-            ]
+            'termAverage' => $termAverage,
+            'currentTerm' => $currentTerm,
+            'performanceMessage' => $this->getPerformanceMessage($termAverage),
+            'featuredPosterStudent'    => $studentPoster['path'],
+            'featuredPosterStudentUrl' => $studentPoster['url'],
+            'nutrition_profile_incomplete' => ! StudentModel::isNutritionProfileComplete($student),
         ]);
     }
 
@@ -173,42 +139,14 @@ class Dashboard extends BaseController
         $studentWithSection = $studentModel->getStudentWithSection($student['id']);
 
         return view('student/profile', [
-            'title' => 'My Profile - LPHS SMS',
+            'title' => 'My Profile - CSCS SMS',
             'student' => $studentWithSection
         ]);
     }
 
     public function grades()
     {
-        // Check if user is authenticated; allow dev/test mode fallback
         if (!$this->auth->loggedIn()) {
-            if ($this->isDevTestMode()) {
-                // Render grades page with sample data in development/test
-                $schoolYear = $this->request->getGet('school_year') ?? '2025-2026';
-                $quarter = (int)($this->request->getGet('quarter') ?? 1);
-
-                // Sample grades data for testing - Grade 7 student
-                $sampleGrades = $this->getSampleGrade7Data();
-
-                return view('student/grades', [
-                    'title' => 'My Grades - LPHS SMS',
-                    'student' => [
-                        'id' => 1,
-                        'first_name' => 'Demo',
-                        'last_name' => 'Student',
-                        'lrn' => '123456789001',
-                        'grade_level' => 7,
-                        'enrollment_status' => 'enrolled'
-                    ],
-                    'grades' => $sampleGrades,
-                    'schoolYear' => '2025-2026',
-                    'quarter' => 2,
-                    'quarterAverage' => 85.5,
-                    'gwa' => 84.75,
-                    'canEnrollNextSemester' => true,
-                    'allQuarterGrades' => [1 => 86.2, 2 => 85.1, 3 => 83.8, 4 => 83.9],
-                ]);
-            }
             return redirect()->to(base_url('login'));
         }
 
@@ -224,19 +162,19 @@ class Dashboard extends BaseController
         $gradeModel = new GradeModel();
         $subjectModel = new SubjectModel();
 
-        $schoolYear = $this->request->getGet('school_year') ?? '2025-2026';
-        $quarter = $this->request->getGet('quarter') ?? 2; // Current quarter
+        $schoolYear = $this->request->getGet('school_year') ?? get_current_school_year();
+        $term = (int) ($this->request->getGet('term') ?? $this->getCurrentTerm());
 
-        // Get subjects for student's grade level
-        $subjects = $subjectModel->getByGradeLevel($student['grade_level']);
+        // Get subjects assigned to student's section
+        $subjects = $student['section_id'] ? $subjectModel->getSectionSubjects($student['section_id']) : [];
 
-        // Get grades for the selected period
+        // Get grades for the selected term
         $grades = [];
         foreach ($subjects as $subject) {
             $grade = $gradeModel->where('student_id', $student['id'])
                 ->where('subject_id', $subject['id'])
                 ->where('school_year', $schoolYear)
-                ->where('quarter', $quarter)
+                ->where('term', $term)
                 ->first();
 
             $grades[] = [
@@ -245,55 +183,38 @@ class Dashboard extends BaseController
             ];
         }
 
-        // Calculate quarter average
-        $quarterAverage = $gradeModel->getQuarterAverage($student['id'], $schoolYear, $quarter);
-
-        // Calculate GWA (General Weighted Average) for the entire school year
+        $termAverage = $gradeModel->getTermAverage($student['id'], $schoolYear, $term);
         $gwa = $gradeModel->getFinalAverage($student['id'], $schoolYear);
 
-        // Get all quarter grades for overview
-        $allQuarterGrades = [];
-        for ($q = 1; $q <= 4; $q++) {
-            $qAvg = $gradeModel->getQuarterAverage($student['id'], $schoolYear, $q);
-            $allQuarterGrades[$q] = $qAvg;
+        $allTermGrades = [];
+        for ($t = 1; $t <= 3; $t++) {
+            $allTermGrades[$t] = $gradeModel->getTermAverage($student['id'], $schoolYear, $t);
         }
 
-        // Check if student can enroll for next semester (GWA must be 75 or above)
-        $canEnrollNextSemester = ($gwa !== null && $gwa >= 75.0);
-        
-        // For demo mode, provide sample data if no real grades
-        if ($gwa === null && $this->isDevTestMode()) {
-            $gwa = 84.75;
-            $allQuarterGrades = [1 => 86.2, 2 => 85.1, 3 => 83.8, 4 => 83.9];
-            $canEnrollNextSemester = true;
+        $canEnrollNextYear = ($gwa !== null && $gwa >= 75.0);
+
+        if ($gwa === null) {
+            $gwa = null;
+            $allTermGrades = [1 => null, 2 => null, 3 => null];
+            $canEnrollNextYear = false;
         }
 
         return view('student/grades', [
-            'title' => 'My Grades - LPHS SMS',
+            'title' => 'My Grades - CSCS SMS',
             'student' => $student,
             'grades' => $grades,
             'schoolYear' => $schoolYear,
-            'quarter' => $quarter,
-            'quarterAverage' => $quarterAverage,
+            'term' => $term,
+            'termAverage' => $termAverage,
             'gwa' => $gwa,
-            'canEnrollNextSemester' => $canEnrollNextSemester,
-            'allQuarterGrades' => $allQuarterGrades,
+            'canEnrollNextYear' => $canEnrollNextYear,
+            'allTermGrades' => $allTermGrades,
         ]);
     }
 
     public function schedule()
     {
-        // Check if user is authenticated; allow dev/test mode fallback
         if (!$this->auth->loggedIn()) {
-            if ($this->isDevTestMode()) {
-                $subjectModel = new SubjectModel();
-                $subjects = $subjectModel->getByGradeLevel(10);
-                return view('student/schedule', [
-                    'title' => 'Class Schedule - LPHS SMS',
-                    'student' => [ 'id' => 0, 'grade_level' => 10 ],
-                    'subjects' => $subjects,
-                ]);
-            }
             return redirect()->to(base_url('login'));
         }
         
@@ -306,19 +227,86 @@ class Dashboard extends BaseController
             return redirect()->to(base_url('/'))->with('error', 'Student record not found.');
         }
 
-        $subjectModel = new SubjectModel();
-        $subjects = $subjectModel->getByGradeLevel($student['grade_level']);
+        // Get class schedule for student's section
+        $schedules = [];
+        if ($student['section_id']) {
+            $db = \Config\Database::connect();
+            try {
+                $classSchedules = $db->query("
+                    SELECT ts.*, sub.subject_name, 
+                           CONCAT(t.first_name, ' ', t.last_name) as teacher_name
+                    FROM teacher_schedules ts
+                    LEFT JOIN subjects sub ON sub.id = ts.subject_id
+                    LEFT JOIN teachers t ON t.id = ts.teacher_id
+                    WHERE ts.section_id = ? AND ts.school_year = ?
+                    ORDER BY ts.day_of_week, ts.start_time
+                ", [$student['section_id'], get_current_school_year()])->getResultArray();
+                
+                // Organize schedules by day and time
+                foreach ($classSchedules as $schedule) {
+                    $timeSlot = date('H:i', strtotime($schedule['start_time'])) . '-' . date('H:i', strtotime($schedule['end_time']));
+                    $schedules[strtolower($schedule['day_of_week'])][$timeSlot] = $schedule;
+                }
+            } catch (\Exception $e) {
+                $schedules = [];
+            }
+        }
 
         return view('student/schedule', [
-            'title' => 'Class Schedule - LPHS SMS',
+            'title' => 'Class Schedule - CSCS SMS',
             'student' => $student,
-            'subjects' => $subjects
+            'schedules' => $schedules
         ]);
     }
 
     public function announcements()
     {
-        // Check if user is authenticated
+        if (!$this->auth->loggedIn()) {
+            return redirect()->to(base_url('login'));
+        }
+        
+        if (!$this->auth->user()->inGroup('student')) {
+            return redirect()->to(base_url('/'))->with('error', 'Access denied. Student role required.');
+        }
+
+        $student = $this->getStudentRecord();
+        $db = \Config\Database::connect();
+        $userId = $this->auth->user()->id;
+        
+        // Use Query Builder instead of raw SQL concatenation to prevent SQL injection
+        $builder = $db->table('announcements a');
+        $builder->select('a.*, CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END as is_read', false);
+        $builder->join('announcement_reads ar', 'ar.announcement_id = a.id AND ar.user_id = ' . (int) $userId, 'left');
+        $builder->groupBy('a.id');
+        $builder->whereIn('a.target_roles', ['student', 'all']);
+        
+        if ($student) {
+            $gradeLevel = (int) $student['grade_level'];
+            $sectionId = (int) ($student['section_id'] ?? 0);
+            
+            // Use LIKE with escaped value to prevent injection
+            $gradeRolePattern = 'grade_' . $gradeLevel;
+            $builder->orWhere('a.target_roles', $gradeRolePattern);
+            
+            // Handle exact match (already added above) - no need for complex FIND_IN_SET
+            
+            if ($sectionId > 0) {
+                $sectionRolePattern = 'section_' . $sectionId;
+                $builder->orWhere('a.target_roles', $sectionRolePattern);
+            }
+        }
+        
+        $builder->orderBy('a.created_at', 'DESC');
+        $announcements = $builder->get()->getResultArray();
+
+        return view('student/announcements', [
+            'title' => 'Announcements - CSCS SMS',
+            'announcements' => $announcements
+        ]);
+    }
+
+    public function viewAnnouncement($id)
+    {
         if (!$this->auth->loggedIn()) {
             return redirect()->to(base_url('login'));
         }
@@ -328,15 +316,22 @@ class Dashboard extends BaseController
         }
 
         $announcementModel = new AnnouncementModel();
-        
-        $announcements = $announcementModel->where('target_roles', 'all')
-            ->orWhere('target_roles', 'student')
-            ->orderBy('published_at', 'DESC')
-            ->findAll();
+        $announcement = $announcementModel->find((int) $id);
 
-        return view('student/announcements', [
-            'title' => 'Announcements - LPHS SMS',
-            'announcements' => $announcements
+        if (!$announcement) {
+            return redirect()->to('student/announcements')->with('error', 'Announcement not found.');
+        }
+
+        $db = \Config\Database::connect();
+        $userId = $this->auth->user()->id;
+        $exists = $db->table('announcement_reads')->where(['announcement_id' => (int) $id, 'user_id' => $userId])->get()->getRow();
+        if (!$exists) {
+            $db->table('announcement_reads')->insert(['announcement_id' => (int) $id, 'user_id' => $userId, 'read_at' => date('Y-m-d H:i:s')]);
+        }
+
+        return view('student/announcement_view', [
+            'title' => $announcement['title'] . ' - CSCS SMS',
+            'announcement' => $announcement
         ]);
     }
 
@@ -397,21 +392,16 @@ class Dashboard extends BaseController
     }
 
     /**
-     * Get current quarter based on date
+     * Get current term from system settings
      */
-    private function getCurrentQuarter(): int
+    private function getCurrentTerm(): int
     {
-        $month = (int) date('n');
-        
-        if ($month >= 6 && $month <= 8) {
-            return 1; // June-August
-        } elseif ($month >= 9 && $month <= 11) {
-            return 2; // September-November
-        } elseif ($month >= 12 || $month <= 2) {
-            return 3; // December-February
-        } else {
-            return 4; // March-May
-        }
+        $db = \Config\Database::connect();
+        $termSetting = $db->table('system_settings')
+            ->where('setting_key', 'current_term')
+            ->get()->getRowArray();
+
+        return (int) ($termSetting['setting_value'] ?? 1);
     }
 
     /**
@@ -422,185 +412,93 @@ class Dashboard extends BaseController
         return defined('ENVIRONMENT') && ENVIRONMENT !== 'production';
     }
 
-    /**
-     * Get sample Grade 7 data for testing (no grades yet)
-     */
-    private function getSampleGrade7Data()
-    {
-        return [
-            [
-                'subject' => ['id' => 1, 'subject_name' => 'Araling Panlipunan 7', 'subject_code' => 'AP7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 2, 'subject_name' => 'Edukasyon sa Pagpapakatao 7', 'subject_code' => 'ESP7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 3, 'subject_name' => 'English 7', 'subject_code' => 'ENG7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 4, 'subject_name' => 'Filipino 7', 'subject_code' => 'FIL7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 5, 'subject_name' => 'MAPEH 7', 'subject_code' => 'MAPEH7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 6, 'subject_name' => 'Mathematics 7', 'subject_code' => 'MATH7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 7, 'subject_name' => 'Science 7', 'subject_code' => 'SCI7', 'units' => 1.0],
-                'grade' => null
-            ],
-            [
-                'subject' => ['id' => 8, 'subject_name' => 'Technology and Livelihood Education 7', 'subject_code' => 'TLE7', 'units' => 1.0],
-                'grade' => null
-            ]
-        ];
-    }
 
-    /**
-     * Get sample grades data for testing
-     */
-    private function getSampleGradesData()
+    public function viewReportCard()
     {
-        return [
-            [
-                'subject' => ['id' => 1, 'subject_name' => 'Mathematics', 'subject_code' => 'MATH10', 'units' => 3],
-                'grade' => ['grade' => 88.5, 'remarks' => 'Good']
-            ],
-            [
-                'subject' => ['id' => 2, 'subject_name' => 'English', 'subject_code' => 'ENG10', 'units' => 3],
-                'grade' => ['grade' => 92.0, 'remarks' => 'Excellent']
-            ],
-            [
-                'subject' => ['id' => 3, 'subject_name' => 'Science', 'subject_code' => 'SCI10', 'units' => 3],
-                'grade' => ['grade' => 85.0, 'remarks' => 'Very Good']
-            ],
-            [
-                'subject' => ['id' => 4, 'subject_name' => 'Filipino', 'subject_code' => 'FIL10', 'units' => 3],
-                'grade' => ['grade' => 90.5, 'remarks' => 'Excellent']
-            ],
-            [
-                'subject' => ['id' => 5, 'subject_name' => 'Araling Panlipunan', 'subject_code' => 'AP10', 'units' => 3],
-                'grade' => ['grade' => 87.0, 'remarks' => 'Very Good']
-            ],
-            [
-                'subject' => ['id' => 6, 'subject_name' => 'Physical Education', 'subject_code' => 'PE10', 'units' => 2],
-                'grade' => ['grade' => 95.0, 'remarks' => 'Outstanding']
-            ]
-        ];
-    }
-
-    /**
-     * Get sample all quarter grades for testing
-     */
-    private function getSampleAllQuarterGrades()
-    {
-        return [
-            1 => 85.5,
-            2 => 87.2,
-            3 => 84.8,
-            4 => null // Not yet available
-        ];
-    }
-
-    public function enrollment()
-    {
-        return view('student/enrollment', [
-            'title' => 'Next Semester Enrollment - LPHS SMS'
-        ]);
-    }
-
-    public function submitEnrollment()
-    {
-        // Handle enrollment form submission
-        return redirect()->to(base_url('student/enrollment'))->with('success', 'Enrollment application submitted successfully!');
-    }
-
-    public function applyNextYear()
-    {
-        // Handle AJAX request for next year enrollment
-        if (!$this->request->isAJAX()) {
-            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'error' => 'Invalid request']);
+        if (!$this->auth->loggedIn()) {
+            return redirect()->to(base_url('login'));
+        }
+        
+        if (!$this->auth->user()->inGroup('student')) {
+            return redirect()->to(base_url('/'))->with('error', 'Access denied.');
         }
 
-        try {
-            $input = json_decode($this->request->getBody(), true);
-            $nextGradeLevel = $input['next_grade_level'] ?? null;
-            $currentGwa = $input['current_gwa'] ?? null;
-
-            if (!$nextGradeLevel || !$currentGwa) {
-                return $this->response->setJSON(['success' => false, 'error' => 'Missing required data']);
-            }
-
-            // Get student record - try multiple approaches
-            $student = null;
-            $db = \Config\Database::connect();
-            
-            // Try to get authenticated student first
-            if ($this->auth->loggedIn()) {
-                $student = $this->getStudentRecord();
-            }
-            
-            // Fallback: try to find student by LRN 100000000001 for demo
-            if (!$student) {
-                $student = $db->table('students')
-                    ->where('lrn', '100000000001')
-                    ->get()->getRowArray();
-            }
-
-            if (!$student) {
-                return $this->response->setJSON(['success' => false, 'error' => 'Student record not found']);
-            }
-
-            // Check if table exists first
-            if (!$db->tableExists('next_year_applications')) {
-                return $this->response->setJSON(['success' => false, 'error' => 'Database table not found. Please contact administrator.']);
-            }
-
-            // Check if already applied
-            $existing = $db->table('next_year_applications')
-                ->where('student_id', $student['id'])
-                ->where('school_year', '2026-2027')
-                ->get()->getRow();
-
-            if ($existing) {
-                return $this->response->setJSON(['success' => false, 'error' => 'You have already applied for next school year']);
-            }
-
-            // Insert application
-            $applicationData = [
-                'student_id' => $student['id'],
-                'current_grade_level' => $student['grade_level'],
-                'next_grade_level' => $nextGradeLevel,
-                'gwa' => $currentGwa,
-                'school_year' => '2026-2027',
-                'status' => 'pending',
-                'applied_at' => date('Y-m-d H:i:s'),
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
-
-            $result = $db->table('next_year_applications')->insert($applicationData);
-            
-            if (!$result) {
-                $error = $db->error();
-                return $this->response->setJSON(['success' => false, 'error' => 'Failed to save application: ' . $error['message']]);
-            }
-
-            return $this->response->setJSON([
-                'success' => true,
-                'message' => 'Application submitted successfully! The admin will review your application for Grade ' . $nextGradeLevel . '.'
-            ]);
-
-        } catch (\Exception $e) {
-            log_message('error', 'Next year application error: ' . $e->getMessage());
-            return $this->response->setJSON(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+        $student = $this->getStudentRecord();
+        if (!$student) {
+            return redirect()->to(base_url('/'))->with('error', 'Student record not found.');
         }
+        
+        // Check if student can view report card
+        if (($student['can_view_report_card'] ?? 0) == 0) {
+            return redirect()->to(base_url('student/grades'))->with('error', 'Report card access has been disabled by your teacher.');
+        }
+        
+        // Get student with section and teacher information
+        $studentModel = new StudentModel();
+        $student = $studentModel->select('students.*, sections.section_name, sections.adviser_id, CONCAT(teachers.first_name, " ", teachers.last_name) as adviser_name')
+            ->join('sections', 'sections.id = students.section_id', 'left')
+            ->join('teachers', 'teachers.id = sections.adviser_id', 'left')
+            ->where('students.id', $student['id'])
+            ->first();
+
+        $gradeModel = new GradeModel();
+        $subjectModel = new SubjectModel();
+        
+        $schoolYear = get_current_school_year();
+        
+        // Get subjects assigned to student's section
+        $subjects = $student['section_id'] ? $subjectModel->getSectionSubjects($student['section_id']) : [];
+        
+        // Get grades for all terms
+        $grades = [];
+        $termAverages = [];
+
+        for ($term = 1; $term <= 3; $term++) {
+            $termGrades = [];
+            foreach ($subjects as $subject) {
+                $grade = $gradeModel->where('student_id', $student['id'])
+                    ->where('subject_id', $subject['id'])
+                    ->where('school_year', $schoolYear)
+                    ->where('term', $term)
+                    ->first();
+
+                $termGrades[$subject['id']] = $grade ? $grade['grade'] : null;
+            }
+            $grades[$term] = $termGrades;
+
+            $validGrades = array_filter($termGrades, function($g) { return $g !== null; });
+            $termAverages[$term] = !empty($validGrades) ? array_sum($validGrades) / count($validGrades) : null;
+        }
+
+        $validTerms = array_filter($termAverages, function($avg) { return $avg !== null; });
+        $finalAverage = !empty($validTerms) ? array_sum($validTerms) / count($validTerms) : null;
+
+        $data = [
+            'student' => $student,
+            'subjects' => $subjects,
+            'grades' => $grades,
+            'termAverages' => $termAverages,
+            'finalAverage' => $finalAverage,
+            'schoolYear' => $schoolYear,
+            'reportDate' => date('F j, Y'),
+            'logoBase64' => school_logo_base64(),
+        ];
+        
+        $html = view('student/report_card_pdf', $data);
+        
+        $options = new \Dompdf\Options();
+        $options->set('defaultFont', 'Times');
+        $options->set('isRemoteEnabled', false);
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isPhpEnabled', false);
+        
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        
+        $filename = 'LPHS_Report_Card_' . $student['first_name'] . '_' . $student['last_name'] . '_' . date('Y-m-d') . '.pdf';
+
+        return $this->sendPdfInline($dompdf, $filename);
     }
 }

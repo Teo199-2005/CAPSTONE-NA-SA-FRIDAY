@@ -2,10 +2,10 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>LPHS Teacher Analytics Report</title>
+    <title>CSCS Teacher Analytics Report</title>
     <style>
         body {
-            font-family: 'Times New Roman', serif;
+            font-family: Arial, Helvetica, sans-serif;
             margin: 0;
             padding: 20px;
             color: #000;
@@ -111,13 +111,15 @@
         
         .footer {
             position: fixed;
-            bottom: 20px;
+            bottom: 15px;
             left: 20px;
             right: 20px;
             text-align: center;
             font-size: 10px;
             border-top: 1px solid #000;
-            padding-top: 10px;
+            padding-top: 8px;
+            background: white;
+            z-index: 1000;
         }
         
         .page-break {
@@ -129,21 +131,19 @@
     <div class="header">
         <div class="logo">
             <?php
-            $logoPath = FCPATH . 'LPHS2.png';
-            if (file_exists($logoPath) && function_exists('imagecreatefrompng')) {
-                $imageData = file_get_contents($logoPath);
-                $base64 = base64_encode($imageData);
-                echo '<img src="data:image/png;base64,' . $base64 . '" alt="LPHS Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">';
+            $logoB64 = school_logo_base64();
+            if ($logoB64 !== '') {
+                echo '<img src="data:image/png;base64,' . esc($logoB64, 'attr') . '" alt="School Logo" style="width: 80px; height: 80px; margin: 0 auto; display: block;">';
             } else {
-                echo '<div style="width: 80px; height: 80px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #f0f0f0;"><strong style="font-size: 18px;">LPHS</strong></div>';
+                echo '<div style="width: 80px; height: 80px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #f0f0f0;"><strong style="font-size: 18px;">CSCS</strong></div>';
             }
             ?>
         </div>
-        <div class="school-name">Lourdes Provincial High School</div>
+        <div class="school-name">Cauayan South Central School</div>
         <div class="report-title">Teacher Class Analytics Report</div>
         <div class="report-info">Teacher: <?= esc($teacher['first_name'] . ' ' . $teacher['last_name']) ?></div>
-        <div class="report-info">School Year: <?= $schoolYear ?> | Quarter: <?= $currentQuarter ?></div>
-        <div class="report-info">Report Generated: <?= $reportDate ?></div>
+        <div class="report-info">School Year: <?= $schoolYear ?> | Term: <?= $currentTerm ?></div>
+        <div class="report-info">Report Generated: <?= $reportDate ?> at <?= $reportTime ?? date('g:i A') ?></div>
     </div>
 
     <div class="section">
@@ -157,13 +157,18 @@
         </div>
     </div>
 
+    <?php
+    $gradedForDist = (int) ($analytics['studentsGradedForDistribution'] ?? 0);
+    $distDenom = max(1, $gradedForDist);
+    ?>
     <div class="section">
         <div class="section-title">Grade Distribution</div>
+        <p style="font-size: 11px; margin: 0 0 8px 0;">Percentages are of students with at least one grade this term in the subjects included (<?= $gradedForDist ?> students).</p>
         <table class="data-table">
             <thead>
                 <tr>
                     <th>Grade Range</th>
-                    <th>Count</th>
+                    <th>Count (students)</th>
                     <th>Percentage</th>
                 </tr>
             </thead>
@@ -171,54 +176,54 @@
                 <tr>
                     <td>Excellent (90-100)</td>
                     <td><?= $analytics['gradeDistribution']['excellent'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['excellent'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['excellent'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
                 <tr>
                     <td>Very Good (85-89)</td>
                     <td><?= $analytics['gradeDistribution']['very_good'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['very_good'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['very_good'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
                 <tr>
                     <td>Good (80-84)</td>
                     <td><?= $analytics['gradeDistribution']['good'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['good'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['good'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
                 <tr>
                     <td>Fair (75-79)</td>
                     <td><?= $analytics['gradeDistribution']['fair'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['fair'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['fair'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
                 <tr>
                     <td>Passing (70-74)</td>
                     <td><?= $analytics['gradeDistribution']['passing'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['passing'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['passing'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
                 <tr>
                     <td>Failing (<70)</td>
                     <td><?= $analytics['gradeDistribution']['failing'] ?></td>
-                    <td><?= $analytics['totalStudents'] > 0 ? round(($analytics['gradeDistribution']['failing'] / $analytics['totalStudents']) * 100, 1) : 0 ?>%</td>
+                    <td><?= round(($analytics['gradeDistribution']['failing'] / $distDenom) * 100, 1) ?>%</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
     <?php if (!empty($analytics['subjectAverages'])): ?>
-    <div class="section">
+    <div class="section" style="margin-bottom: 80px;">
         <div class="section-title">Subject Performance</div>
-        <table class="data-table">
+        <table class="data-table" style="margin-bottom: 30px;">
             <thead>
                 <tr>
-                    <th>Subject</th>
-                    <th>Average Grade</th>
-                    <th>Students Graded</th>
+                    <th style="width: 60%;">Subject</th>
+                    <th style="width: 20%;">Average Grade</th>
+                    <th style="width: 20%;">Students Graded</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($analytics['subjectAverages'] as $subject): ?>
                 <tr>
-                    <td><?= esc($subject['subject']) ?></td>
-                    <td><?= number_format($subject['average'], 1) ?>%</td>
-                    <td><?= $subject['count'] ?></td>
+                    <td style="padding: 10px 8px;"><?= esc($subject['subject']) ?></td>
+                    <td style="padding: 10px 8px; text-align: center;"><?= number_format($subject['average'], 1) ?>%</td>
+                    <td style="padding: 10px 8px; text-align: center;"><?= $subject['count'] ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -226,16 +231,61 @@
     </div>
     <?php endif; ?>
 
+    <div class="section">
+        <div class="section-title">Attendance Summary</div>
+        <div class="summary-box">
+            <p><strong>Overall Attendance Rate:</strong> <?= number_format($analytics['attendanceStats']['attendanceRate'] ?? 0, 1) ?>%</p>
+            <p><strong>Total Records:</strong> <?= $analytics['attendanceStats']['total'] ?? 0 ?></p>
+            <p><strong>Present:</strong> <?= $analytics['attendanceStats']['present'] ?? 0 ?> students</p>
+            <p><strong>Absent:</strong> <?= $analytics['attendanceStats']['absent'] ?? 0 ?> students</p>
+            <p><strong>Late:</strong> <?= $analytics['attendanceStats']['late'] ?? 0 ?> students</p>
+            <p><strong>Excused:</strong> <?= $analytics['attendanceStats']['excused'] ?? 0 ?> students</p>
+        </div>
+        
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Count</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Present</td>
+                    <td><?= $analytics['attendanceStats']['present'] ?? 0 ?></td>
+                    <td><?= $analytics['attendanceStats']['total'] > 0 ? round(($analytics['attendanceStats']['present'] / $analytics['attendanceStats']['total']) * 100, 1) : 0 ?>%</td>
+                </tr>
+                <tr>
+                    <td>Absent</td>
+                    <td><?= $analytics['attendanceStats']['absent'] ?? 0 ?></td>
+                    <td><?= $analytics['attendanceStats']['total'] > 0 ? round(($analytics['attendanceStats']['absent'] / $analytics['attendanceStats']['total']) * 100, 1) : 0 ?>%</td>
+                </tr>
+                <tr>
+                    <td>Late</td>
+                    <td><?= $analytics['attendanceStats']['late'] ?? 0 ?></td>
+                    <td><?= $analytics['attendanceStats']['total'] > 0 ? round(($analytics['attendanceStats']['late'] / $analytics['attendanceStats']['total']) * 100, 1) : 0 ?>%</td>
+                </tr>
+                <tr>
+                    <td>Excused</td>
+                    <td><?= $analytics['attendanceStats']['excused'] ?? 0 ?></td>
+                    <td><?= $analytics['attendanceStats']['total'] > 0 ? round(($analytics['attendanceStats']['excused'] / $analytics['attendanceStats']['total']) * 100, 1) : 0 ?>%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <?php if (!empty($analytics['studentPerformance'])): ?>
     <div class="section">
         <div class="section-title">Top Performing Students</div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>Rank</th>
-                    <th>Student Name</th>
-                    <th>Average Grade</th>
-                    <th>Subjects</th>
+                    <th style="width: 10%;">Rank</th>
+                    <th style="width: 35%;">Student Name</th>
+                    <th style="width: 20%;">Average Grade</th>
+                    <th style="width: 20%;">Performance Level</th>
+                    <th style="width: 15%;">Subjects</th>
                 </tr>
             </thead>
             <tbody>
@@ -246,24 +296,44 @@
                 });
                 ?>
                 <?php foreach (array_slice($analytics['studentPerformance'], 0, 10) as $index => $student): ?>
+                <?php
+                $performanceLevel = $student['average'] >= 90 ? 'Excellent (90-100%)' : 
+                                  ($student['average'] >= 85 ? 'Very Good (85-89%)' : 
+                                  ($student['average'] >= 80 ? 'Good (80-84%)' : 
+                                  ($student['average'] >= 75 ? 'Fair (75-79%)' : 
+                                  ($student['average'] >= 70 ? 'Passing (70-74%)' : 'Below 70%'))));
+                $rankStyle = $index < 3 ? 'font-weight: bold; color: #d4af37;' : '';
+                ?>
                 <tr>
-                    <td><?= $index + 1 ?></td>
-                    <td><?= esc($student['name']) ?></td>
-                    <td><?= number_format($student['average'], 1) ?>%</td>
-                    <td><?= $student['grade_count'] ?></td>
+                    <td style="text-align: center; <?= $rankStyle ?>"><?= $index + 1 ?></td>
+                    <td style="<?= $rankStyle ?>"><?= esc($student['name']) ?></td>
+                    <td style="text-align: center; <?= $rankStyle ?>"><?= number_format($student['average'], 1) ?>%</td>
+                    <td style="<?= $rankStyle ?>"><?= $performanceLevel ?></td>
+                    <td style="text-align: center; <?= $rankStyle ?>"><?= $student['grade_count'] ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+        
+        <?php if (count($analytics['studentPerformance']) > 10): ?>
+        <p style="text-align: center; font-style: italic; margin-top: 10px;">Showing top 10 students. Total students with grades: <?= count($analytics['studentPerformance']) ?></p>
+        <?php endif; ?>
+    </div>
+    <?php else: ?>
+    <div class="section">
+        <div class="section-title">Student Performance</div>
+        <div class="summary-box">
+            <p><strong>No student performance data available.</strong> Grades have not been recorded for the current term yet.</p>
+        </div>
     </div>
     <?php endif; ?>
 
     <div class="section">
-        <div class="section-title">Quarter Performance Trends</div>
+        <div class="section-title">Term Performance Trends</div>
         <div class="metric-grid">
-            <?php foreach ($analytics['quarterTrends'] as $trend): ?>
+            <?php foreach ($analytics['termTrends'] as $trend): ?>
             <div class="metric-row">
-                <div class="metric-label"><?= esc($trend['quarter']) ?></div>
+                <div class="metric-label"><?= esc($trend['term']) ?></div>
                 <div class="metric-value"><?= number_format($trend['average'], 1) ?>%</div>
             </div>
             <?php endforeach; ?>
@@ -295,7 +365,7 @@
     </div>
 
     <div class="footer">
-        <p>Lourdes Provincial High School - Teacher Analytics Report | Generated on <?= date('F j, Y \a\t g:i A') ?></p>
+        <p>Cauayan South Central School - Teacher Analytics Report | Generated on <?= date('F j, Y \a\t g:i A', time()) ?></p>
         <p>This report contains confidential information. Distribution is restricted to authorized personnel only.</p>
     </div>
 </body>

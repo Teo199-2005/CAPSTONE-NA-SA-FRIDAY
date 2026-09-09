@@ -1,9 +1,7 @@
 <?php
-
 namespace Config;
 
 use CodeIgniter\Events\Events;
-use CodeIgniter\Exceptions\FrameworkException;
 use CodeIgniter\HotReloader\HotReloader;
 
 /*
@@ -25,8 +23,10 @@ use CodeIgniter\HotReloader\HotReloader;
 
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
+        // Shared hosts (e.g. Hostinger) often enable zlib compression in php.ini.
+        // Throwing here breaks every page with a generic "Whoops" error.
         if (ini_get('zlib.output_compression')) {
-            throw FrameworkException::forEnabledZlibOutputCompression();
+            log_message('warning', 'zlib.output_compression is enabled. Disable it in php.ini or .user.ini for best CodeIgniter compatibility.');
         }
 
         while (ob_get_level() > 0) {

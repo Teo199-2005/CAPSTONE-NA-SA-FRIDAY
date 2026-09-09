@@ -21,7 +21,20 @@
   right: 0;
   bottom: 0;
   background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="%233b82f6" stroke-width="0.5" opacity="0.2"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-  opacity: 1;
+  opacity: 0.9;
+}
+
+.register-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('<?= asset_url('LPHS2.png') ?>');
+  background-repeat: repeat;
+  background-size: 110px 110px;
+  background-position: center center;
+  opacity: 0.095;
+  filter: grayscale(0.7) saturate(0.8);
+  pointer-events: none;
 }
 
 .register-card {
@@ -44,10 +57,22 @@
   border-bottom: 1px solid rgba(59, 130, 246, 0.1);
 }
 
+.register-logo {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  display: block;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
 .register-title {
   font-size: 2rem;
   font-weight: 800;
-  font-family: 'Times New Roman', serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #ea580c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -251,71 +276,362 @@
   float: right;
 }
 
-.demo-float-button {
-  position: fixed;
-  top: 100px;
-  right: 20px;
-  z-index: 1000;
-  animation: float 3s ease-in-out infinite;
-}
-
-.demo-float-button .btn {
-  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-  border: none;
-  color: white;
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  border-radius: 25px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
-  font-size: 0.9rem;
-}
-
-.demo-float-button .btn:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
-  background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
-}
-
-.demo-float-button .btn:active {
-  transform: translateY(0) scale(1);
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
   }
-  50% {
-    transform: translateY(-5px);
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .demo-float-button {
-    top: 60px;
-    right: 10px;
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+
+/* Large tablets */
+@media (max-width: 991.98px) {
+  .register-header {
+    padding: 2.5rem 2rem 1.5rem;
+  }
+  
+  .register-title {
+    font-size: 1.75rem;
+  }
+  
+  .register-logo {
+    width: 70px;
+    height: 70px;
+  }
+  
+  .register-form {
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+}
+
+/* Medium devices (tablets, 768px and below) */
+@media (max-width: 767.98px) {
+  .register-container {
+    padding: 1.5rem 0.75rem;
+  }
+  
+  .register-card {
+    border-radius: 16px;
+    max-width: 100%;
+  }
+  
+  .register-header {
+    padding: 2rem 1.5rem 1.25rem;
+  }
+  
+  .register-logo {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 0.75rem;
+  }
+  
+  .register-title {
+    font-size: 1.5rem;
+  }
+  
+  .register-subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .register-form {
+    padding: 1rem 1.25rem 1.25rem;
+  }
+  
+  .form-control, .form-select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.5rem 0.625rem;
+  }
+  
+  .form-label {
+    font-size: 0.78rem;
+  }
+  
+  .section-title {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .step-indicator {
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* 2-column grid for tablets */
+  .register-form .row > [class*="col-"] {
+    margin-bottom: 0.5rem;
+  }
+  
+  .register-form .row.g-2 {
+    --bs-gutter-y: 0.5rem;
+  }
+  
+  .register-form .row.g-3 {
+    --bs-gutter-y: 0.5rem;
   }
 
-  .demo-float-button .btn {
-    padding: 0.5rem 1rem;
+  /* Password toggle buttons on register */
+  .register-form .position-relative button {
+    right: 4px !important;
+    padding: 6px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* Small phones */
+@media (max-width: 575.98px) {
+  .register-container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .register-header {
+    padding: 1.5rem 1rem 1rem;
+  }
+  
+  .register-logo {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 0.5rem;
+  }
+  
+  .register-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .register-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .register-form {
+    padding: 0.75rem 0.75rem 1rem;
+  }
+  
+  /* 2x2x1 grid: 2 columns per row, last row full width */
+  .register-form .row > .col-md-3,
+  .register-form .row > .col-md-4,
+  .register-form .row > .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  
+  /* Full width items on mobile */
+  .register-form .row > .col-md-12 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  
+  /* Ensure Address textarea and other full-width elements span full width */
+  .register-form .row > .col-md-12:not([class*="col-sm-"]) {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+  
+  .form-control, .form-select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.45rem 0.5rem;
+    border-radius: 6px;
+  }
+  
+  .form-label {
+    font-size: 0.72rem;
+    margin-bottom: 0.15rem;
+  }
+  
+  .section-title {
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.15rem;
+  }
+  
+  .step-indicator {
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .register-form .row {
+    margin-left: -4px;
+    margin-right: -4px;
+  }
+  
+  /* Fix row gap */
+  .register-form .row.g-2 {
+    --bs-gutter-x: 8px;
+    --bs-gutter-y: 6px;
+  }
+  
+  .register-form .row.g-3 {
+    --bs-gutter-x: 8px;
+    --bs-gutter-y: 6px;
+  }
+  
+  .step-navigation {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .step-navigation .right-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .btn-step {
+    padding: 0.5rem 0.875rem;
     font-size: 0.8rem;
   }
+  
+  .register-btn {
+    padding: 0.625rem 1rem;
+    font-size: 0.85rem;
+    min-height: 42px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .alert {
+    padding: 0.625rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+  
+  .alert ul {
+    padding-left: 1.25rem;
+    margin-bottom: 0;
+  }
+  
+  .custom-alert {
+    padding: 1.25rem;
+    width: 88%;
+  }
+  
+  .form-text, .text-muted {
+    font-size: 0.7rem;
+  }
+  
+  .step-navigation #prevBtn {
+    width: 100%;
+  }
+}
+
+/* Very small phones (< 360px) */
+@media (max-width: 359px) {
+  .register-header {
+    padding: 1rem 0.75rem 0.75rem;
+  }
+  
+  .register-logo {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .register-title {
+    font-size: 1.1rem;
+  }
+  
+  .register-form {
+    padding: 0.5rem 0.5rem 0.75rem;
+  }
+  
+  .register-form .row > .col-md-3,
+  .register-form .row > .col-md-4,
+  .register-form .row > .col-md-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+  
+  .form-control, .form-select {
+    padding: 0.375rem 0.5rem;
+    font-size: 16px;
+  }
+  
+  .form-label {
+    font-size: 0.7rem;
+  }
+  
+  .section-title {
+    font-size: 0.8rem;
+  }
+}
+
+/* Landscape mode on small phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .register-container {
+    min-height: auto;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .register-header {
+    padding: 1rem 1rem 0.75rem;
+  }
+  
+  .register-logo {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.25rem;
+  }
+  
+  .register-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.15rem;
+  }
+  
+  .register-subtitle {
+    font-size: 0.7rem;
+  }
+  
+  .register-form {
+    padding: 0.5rem 0.75rem 0.75rem;
+  }
+  
+  .form-control, .form-select {
+    padding: 0.35rem 0.5rem;
+  }
+  
+  .form-label {
+    font-size: 0.7rem;
+  }
+}
+
+/* Ensure password toggle buttons inside register are clickable */
+.register-form .position-relative {
+  position: relative !important;
+}
+
+.register-form .position-relative button {
+  position: absolute !important;
+  cursor: pointer !important;
+  z-index: 5 !important;
+}
+
+/* Ensure password fields have padding for toggle icon */
+.register-form input[type="password"],
+.register-form input[id^="password"] {
+  padding-right: 40px !important;
 }
 </style>
 
 <div class="register-container">
-  <!-- Floating Demo Button -->
-  <div class="demo-float-button">
-    <button type="button" class="btn btn-info btn-sm" onclick="fillDemoData()" title="Auto-fill form with demo data">
-      <i class="bi bi-magic"></i> Demo Fill
-    </button>
-  </div>
+
 
   <div class="register-card">
     <div class="register-header">
+      <img src="<?= asset_url('LPHS2.png') ?>" alt="Cauayan South Central School Logo" class="register-logo">
       <h1 class="register-title">Student Registration</h1>
-      <p class="register-subtitle">Register for enrollment at Lourdes Provincial High School</p>
+      <p class="register-subtitle">Register for enrollment at Cauayan South Central School</p>
     </div>
 
     <div class="register-form">
@@ -334,35 +650,47 @@
             </ul>
           </div>
         <?php endif; ?>
+        
+        <?php 
+        $errorStep = session()->getFlashdata('error_step') ?? 1;
+        ?>
 
-        <form method="post" action="<?= base_url('register') ?>" enctype="multipart/form-data" id="registrationForm">
+        <form method="post" action="<?= base_url('register') ?>" id="registrationForm" novalidate>
           <?= csrf_field() ?>
 
           <div class="step-indicator">
-            <span id="stepText">Step 1 of 5: Personal Information</span>
+            <span id="stepText">Step 1 of 4: Personal Information</span>
           </div>
 
           <!-- Step 1: Personal Information -->
           <div class="form-step active" id="step1">
             <h5 class="section-title">Personal Information</h5>
           <div class="row g-2">
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">First Name *</label>
-              <input type="text" class="form-control" name="first_name" value="<?= old('first_name') ?>" required />
+              <input type="text" class="form-control" name="first_name" value="<?= old('first_name') ?>" oninput="validateNameField(this)" required />
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Middle Name</label>
-              <input type="text" class="form-control" name="middle_name" value="<?= old('middle_name') ?>" />
+            <div class="col-md-3 col-6">
+              <label class="form-label">Middle Name *</label>
+              <input type="text" class="form-control" name="middle_name" value="<?= old('middle_name') ?>" oninput="validateNameField(this)" required />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Last Name *</label>
-              <input type="text" class="form-control" name="last_name" value="<?= old('last_name') ?>" required />
+              <input type="text" class="form-control" name="last_name" value="<?= old('last_name') ?>" oninput="validateNameField(this)" required />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Suffix</label>
-              <input type="text" class="form-control" name="suffix" value="<?= old('suffix') ?>" placeholder="Jr., Sr., III" />
+              <select class="form-select" name="suffix">
+                <option value="">None</option>
+                <option value="Jr." <?= old('suffix') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+                <option value="Sr." <?= old('suffix') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+                <option value="II" <?= old('suffix') === 'II' ? 'selected' : '' ?>>II</option>
+                <option value="III" <?= old('suffix') === 'III' ? 'selected' : '' ?>>III</option>
+                <option value="IV" <?= old('suffix') === 'IV' ? 'selected' : '' ?>>IV</option>
+                <option value="V" <?= old('suffix') === 'V' ? 'selected' : '' ?>>V</option>
+              </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Gender *</label>
               <select class="form-select" name="gender" required>
                 <option value="">Select</option>
@@ -370,45 +698,48 @@
                 <option value="Female" <?= old('gender') === 'Female' ? 'selected' : '' ?>>Female</option>
               </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Date of Birth *</label>
               <input type="date" class="form-control" name="date_of_birth" value="<?= old('date_of_birth') ?>" required />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Grade Level *</label>
-              <select class="form-select" name="grade_level" required>
+              <select class="form-select" name="grade_level" id="grade_level" required>
                 <option value="">Select</option>
-                <option value="7" <?= old('grade_level') === '7' ? 'selected' : '' ?>>Grade 7</option>
-                <option value="8" <?= old('grade_level') === '8' ? 'selected' : '' ?>>Grade 8</option>
-                <option value="9" <?= old('grade_level') === '9' ? 'selected' : '' ?>>Grade 9</option>
-                <option value="10" <?= old('grade_level') === '10' ? 'selected' : '' ?>>Grade 10</option>
-                <option value="11" <?= old('grade_level') === '11' ? 'selected' : '' ?>>Grade 11</option>
-                <option value="12" <?= old('grade_level') === '12' ? 'selected' : '' ?>>Grade 12</option>
+                <?php foreach (grade_level_options() as $g): ?>
+                  <option value="<?= $g ?>" <?= old('grade_level') === (string) $g ? 'selected' : '' ?>><?= esc(grade_level_label($g)) ?></option>
+                <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">LRN</label>
-              <input type="text" class="form-control" name="lrn" value="<?= old('lrn') ?>" placeholder="e.g. 123456789012" />
+            <div class="col-md-3 col-6">
+              <label class="form-label">LRN *</label>
+              <input type="text" class="form-control" name="lrn" value="<?= old('lrn') ?>" placeholder="e.g. 123456789012" maxlength="12" pattern="[0-9]{12}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12)" required />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
               <label class="form-label">Student Type *</label>
               <select class="form-select" name="student_type" required>
                 <option value="">Select</option>
                 <option value="New Student" <?= old('student_type') === 'New Student' ? 'selected' : '' ?>>New Student</option>
                 <option value="Transferee" <?= old('student_type') === 'Transferee' ? 'selected' : '' ?>>Transferee</option>
+                <option value="Old Student" <?= old('student_type') === 'Old Student' ? 'selected' : '' ?>>Old Student</option>
               </select>
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Place of Birth</label>
-              <input type="text" class="form-control" name="place_of_birth" value="<?= old('place_of_birth') ?>" />
+            <div class="col-md-6 col-12">
+              <label class="form-label">Place of Birth *</label>
+              <input type="text" class="form-control" name="place_of_birth" value="<?= old('place_of_birth') ?>" required />
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Nationality</label>
-              <input type="text" class="form-control" name="nationality" value="<?= old('nationality', 'Filipino') ?>" />
+            <div class="col-md-3 col-6">
+              <label class="form-label">Nationality *</label>
+              <select class="form-select" name="nationality" required>
+                <option value="">Select nationality</option>
+                <?php foreach (nationality_options() as $nationality): ?>
+                  <option value="<?= esc($nationality) ?>" <?= old('nationality', 'Filipino') === $nationality ? 'selected' : '' ?>><?= esc($nationality) ?></option>
+                <?php endforeach; ?>
+              </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Religion</label>
-              <input type="text" class="form-control" name="religion" value="<?= old('religion') ?>" />
+            <div class="col-md-3 col-6">
+              <label class="form-label">Religion *</label>
+              <input type="text" class="form-control" name="religion" value="<?= old('religion') ?>" required />
             </div>
           </div>
 
@@ -418,17 +749,17 @@
           <div class="form-step" id="step2">
             <h5 class="section-title">Contact Information</h5>
           <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-6 col-12">
               <label class="form-label">Email Address *</label>
               <input type="email" class="form-control" name="email" value="<?= old('email') ?>" required />
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Contact Number</label>
-              <input type="text" class="form-control" name="contact_number" value="<?= old('contact_number') ?>" />
+            <div class="col-md-6 col-12">
+              <label class="form-label">Contact Number *</label>
+              <input type="text" class="form-control" name="contact_number" value="<?= old('contact_number') ?>" oninput="validatePhoneField(this)" required />
             </div>
-            <div class="col-md-12">
-              <label class="form-label">Address</label>
-              <textarea class="form-control" name="address" rows="2"><?= old('address') ?></textarea>
+            <div class="col-md-12 col-12">
+              <label class="form-label">Address *</label>
+              <textarea class="form-control" name="address" rows="2" required><?= old('address') ?></textarea>
             </div>
           </div>
 
@@ -438,77 +769,67 @@
           <div class="form-step" id="step3">
             <h5 class="section-title">Emergency Contact</h5>
           <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">Emergency Contact Name</label>
-              <input type="text" class="form-control" name="emergency_contact_name" value="<?= old('emergency_contact_name') ?>" />
+            <div class="col-md-4 col-6">
+              <label class="form-label">Emergency Contact Name *</label>
+              <input type="text" class="form-control" name="emergency_contact_name" value="<?= old('emergency_contact_name') ?>" oninput="validateNameField(this)" required />
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Emergency Contact Number</label>
-              <input type="text" class="form-control" name="emergency_contact_number" value="<?= old('emergency_contact_number') ?>" />
+            <div class="col-md-4 col-6">
+              <label class="form-label">Emergency Contact Number *</label>
+              <input type="text" class="form-control" name="emergency_contact_number" value="<?= old('emergency_contact_number') ?>" oninput="validatePhoneField(this)" required />
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Relationship</label>
-              <input type="text" class="form-control" name="emergency_contact_relationship" value="<?= old('emergency_contact_relationship') ?>" placeholder="Parent, Guardian, etc." />
+            <div class="col-md-4 col-12">
+              <label class="form-label">Relationship *</label>
+              <select class="form-select" name="emergency_contact_relationship" required>
+                <option value="">Select relationship</option>
+                <?php foreach (emergency_contact_relationship_options() as $relationship): ?>
+                  <option value="<?= esc($relationship) ?>" <?= old('emergency_contact_relationship') === $relationship ? 'selected' : '' ?>><?= esc($relationship) ?></option>
+                <?php endforeach; ?>
+              </select>
             </div>
           </div>
 
           </div>
 
-          <!-- Step 4: Documents -->
+          <!-- Step 4: Account Information -->
           <div class="form-step" id="step4">
-            <h5 class="section-title">Required Documents (PDF/JPG/PNG)</h5>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Birth Certificate *</label>
-              <input type="file" class="form-control" name="birth_certificate" accept=".pdf,.jpg,.jpeg,.png" required />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Report Card (Form 138) *</label>
-              <input type="file" class="form-control" name="report_card" accept=".pdf,.jpg,.jpeg,.png" required />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Good Moral Certificate *</label>
-              <input type="file" class="form-control" name="good_moral" accept=".pdf,.jpg,.jpeg,.png" required />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">2x2 Photo *</label>
-              <input type="file" class="form-control" name="photo" accept=".jpg,.jpeg,.png" required />
-            </div>
-          </div>
-
-          </div>
-
-          <!-- Step 5: Account Information -->
-          <div class="form-step" id="step5">
             <h5 class="section-title">Account Information</h5>
           <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-6 col-12">
               <label class="form-label">Password *</label>
               <div class="position-relative">
                 <input type="password" class="form-control" name="password" id="password" required />
-                <button type="button" class="btn btn-sm position-absolute" style="right: 8px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6c757d;" onclick="togglePassword('password')">
+                <button type="button" class="btn btn-sm position-absolute" style="right: 8px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6c757d; padding: 8px; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; z-index: 10;" onclick="togglePassword('password')">
                   <i class="bi bi-eye" id="password-icon"></i>
                 </button>
               </div>
-              <div class="form-text">Minimum 8 characters</div>
+              <div class="form-text" id="password-hint">Minimum 8 characters</div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 col-12">
               <label class="form-label">Confirm Password *</label>
               <div class="position-relative">
                 <input type="password" class="form-control" name="password_confirm" id="password_confirm" required />
-                <button type="button" class="btn btn-sm position-absolute" style="right: 8px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6c757d;" onclick="togglePassword('password_confirm')">
+                <button type="button" class="btn btn-sm position-absolute" style="right: 8px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #6c757d; padding: 8px; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; z-index: 10;" onclick="togglePassword('password_confirm')">
                   <i class="bi bi-eye" id="password_confirm-icon"></i>
                 </button>
               </div>
+              <div class="form-text" id="password-match-hint"></div>
             </div>
           </div>
 
           </div>
 
           <div class="step-navigation">
-            <button type="button" class="btn-step" id="prevBtn" onclick="changeStep(-1)" style="display: none;">Previous</button>
-            <button type="button" class="btn-step" id="nextBtn" onclick="validateAndNext()">Next</button>
-            <button class="register-btn" type="submit" id="submitBtn" style="display: none;">SUBMIT REGISTRATION</button>
+            <button type="button" class="btn-step" id="prevBtn" onclick="changeStep(-1)" style="display: none;">
+            <i class="bi bi-arrow-left me-2"></i>Previous
+          </button>
+            <div class="right-buttons">
+              <button type="button" class="btn-step" id="nextBtn" onclick="validateAndNext()">
+                Next<i class="bi bi-arrow-right ms-2"></i>
+              </button>
+              <button class="register-btn" type="submit" id="submitBtn" style="display: none;">
+                <i class="bi bi-check-circle me-2"></i>SUBMIT REGISTRATION
+              </button>
+            </div>
           </div>
 
 
@@ -521,13 +842,12 @@
         </form>
 
         <script>
-        let currentStep = 1;
-        const totalSteps = 5;
+        let currentStep = <?= $errorStep ?>;
+        const totalSteps = 4;
         const stepTitles = [
           'Personal Information',
           'Contact Information', 
           'Emergency Contact',
-          'Required Documents',
           'Account Information'
         ];
 
@@ -569,27 +889,109 @@
           document.querySelector('.alert-overlay')?.remove();
           document.querySelector('.custom-alert')?.remove();
         }
+        
+        function showSubmittingNotification() {
+          const notification = document.createElement('div');
+          notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+            z-index: 9999;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+          `;
+          notification.innerHTML = `
+            <i class="bi bi-hourglass-split" style="font-size: 1.2rem;"></i>
+            <span>Submitting your registration...</span>
+          `;
+          document.body.appendChild(notification);
+        }
 
-        function validateAndNext() {
-          const currentStepElement = document.getElementById('step' + currentStep);
-          const requiredFields = currentStepElement.querySelectorAll('input[required], select[required]');
+        function getFieldLabel(field) {
+          const wrapper = field.closest('[class*="col-"]');
+          const label = wrapper ? wrapper.querySelector('label') : null;
+          if (label) {
+            return label.textContent.replace(/\s*\*$/, '').trim();
+          }
+          return field.name || 'This field';
+        }
+
+        function isFieldEmpty(field) {
+          if (field.type === 'file') {
+            return !field.files.length;
+          }
+          if (field.tagName === 'SELECT') {
+            return !String(field.value).trim();
+          }
+          return !String(field.value).trim();
+        }
+
+        function validateStep(stepNumber) {
+          const stepElement = document.getElementById('step' + stepNumber);
+          const requiredFields = stepElement.querySelectorAll('input[required], select[required], textarea[required]');
           const emptyFields = [];
 
           requiredFields.forEach(field => {
-            if (field.type === 'file') {
-              if (!field.files.length) {
-                emptyFields.push(field.previousElementSibling.textContent.replace(' *', ''));
-              }
-            } else if (!field.value.trim()) {
-              emptyFields.push(field.previousElementSibling.textContent.replace(' *', ''));
+            if (isFieldEmpty(field)) {
+              emptyFields.push(getFieldLabel(field));
             }
           });
 
-          if (emptyFields.length > 0) {
-            showCustomAlert('Please fill in the following required fields:<br><br><strong>' + emptyFields.join('<br>') + '</strong>');
-            return;
+          if (stepNumber === 2) {
+            const emailField = stepElement.querySelector('input[type="email"]');
+            if (emailField && emailField.value) {
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRegex.test(emailField.value)) {
+                return { valid: false, message: 'Please enter a valid email address.<br><br>Example: <strong>student@example.com</strong>' };
+              }
+            }
           }
 
+          if (stepNumber === 1) {
+            const lrnField = stepElement.querySelector('input[name="lrn"]');
+            if (lrnField && lrnField.value.length !== 12) {
+              return { valid: false, message: 'LRN must be exactly 12 digits.' };
+            }
+          }
+
+          if (emptyFields.length > 0) {
+            return {
+              valid: false,
+              message: 'Please fill in the following required fields:<br><br><strong>' + emptyFields.join('<br>') + '</strong>'
+            };
+          }
+
+          return { valid: true };
+        }
+
+        function validateAllSteps() {
+          for (let step = 1; step <= totalSteps; step++) {
+            const result = validateStep(step);
+            if (!result.valid) {
+              currentStep = step;
+              showStep(currentStep);
+              showCustomAlert(result.message);
+              return false;
+            }
+          }
+          return true;
+        }
+
+        function validateAndNext() {
+          const result = validateStep(currentStep);
+          if (!result.valid) {
+            showCustomAlert(result.message);
+            return;
+          }
+          
           changeStep(1);
         }
 
@@ -606,102 +1008,107 @@
           }
         }
 
-        function fillDemoData() {
-          // Demo data arrays
-          const firstNames = ['Juan', 'Maria', 'Jose', 'Ana', 'Carlos', 'Sofia', 'Miguel', 'Isabella', 'Luis', 'Carmen', 'Pedro', 'Lucia', 'Antonio', 'Elena', 'Francisco'];
-          const middleNames = ['Santos', 'Cruz', 'Reyes', 'Garcia', 'Lopez', 'Martinez', 'Gonzalez', 'Rodriguez', 'Fernandez', 'Morales', 'Jimenez', 'Herrera', 'Medina', 'Castro', 'Ortiz'];
-          const lastNames = ['Dela Cruz', 'Santos', 'Garcia', 'Reyes', 'Lopez', 'Martinez', 'Gonzalez', 'Rodriguez', 'Fernandez', 'Morales', 'Jimenez', 'Herrera', 'Medina', 'Castro', 'Ortiz'];
-          const suffixes = ['', '', '', 'Jr.', 'Sr.', 'III', ''];
-          const genders = ['Male', 'Female'];
-          const gradeLevels = ['7', '8', '9', '10', '11', '12'];
-          const studentTypes = ['New Student', 'Transferee'];
-          const places = ['Tagbilaran City, Bohol', 'Panglao, Bohol', 'Dauis, Bohol', 'Baclayon, Bohol', 'Loboc, Bohol', 'Carmen, Bohol', 'Tubigon, Bohol'];
-          const religions = ['Catholic', 'Protestant', 'Iglesia ni Cristo', 'Baptist', 'Methodist', 'Born Again', 'Seventh-day Adventist'];
-          const relationships = ['Mother', 'Father', 'Guardian', 'Aunt', 'Uncle', 'Grandmother', 'Grandfather'];
-
-          // Helper function to get random item from array
-          const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
-          // Helper function to generate random date between ages 11-17
-          const getRandomBirthDate = () => {
-            const today = new Date();
-            const age = Math.floor(Math.random() * 7) + 11; // 11-17 years old
-            const birthYear = today.getFullYear() - age;
-            const birthMonth = Math.floor(Math.random() * 12) + 1;
-            const birthDay = Math.floor(Math.random() * 28) + 1;
-            return `${birthYear}-${birthMonth.toString().padStart(2, '0')}-${birthDay.toString().padStart(2, '0')}`;
-          };
-
-          // Helper function to generate random phone number
-          const getRandomPhone = () => {
-            const prefixes = ['0917', '0918', '0919', '0920', '0921', '0922', '0923', '0924', '0925', '0926', '0927', '0928', '0929'];
-            const prefix = getRandom(prefixes);
-            const suffix = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
-            return prefix + suffix;
-          };
-
-          // Generate random data
-          const firstName = getRandom(firstNames);
-          const middleName = getRandom(middleNames);
-          const lastName = getRandom(lastNames);
-          const suffix = getRandom(suffixes);
-          const gender = getRandom(genders);
-          const gradeLevel = getRandom(gradeLevels);
-          const studentType = getRandom(studentTypes);
-          const birthDate = getRandomBirthDate();
-          const placeOfBirth = getRandom(places);
-          const religion = getRandom(religions);
-          const contactNumber = getRandomPhone();
-          const emergencyContactNumber = getRandomPhone();
-          const relationship = getRandom(relationships);
-          const lrn = Math.floor(Math.random() * 900000000000) + 100000000000; // Generate 12-digit LRN
-
-          // Generate email based on name
-          const emailUsername = (firstName + lastName).toLowerCase().replace(/\s+/g, '');
-          const emailDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
-          const email = emailUsername + Math.floor(Math.random() * 999) + '@' + getRandom(emailDomains);
-
-          // Generate address
-          const barangays = ['Poblacion', 'Tawala', 'Bolod', 'Danao', 'Tangnan', 'Libaong', 'Lourdes'];
-          const address = `Purok ${Math.floor(Math.random() * 10) + 1}, Barangay ${getRandom(barangays)}, Panglao, Bohol`;
-
-          // Fill Step 1: Personal Information
-          document.querySelector('input[name="first_name"]').value = firstName;
-          document.querySelector('input[name="middle_name"]').value = middleName;
-          document.querySelector('input[name="last_name"]').value = lastName;
-          document.querySelector('input[name="suffix"]').value = suffix;
-          document.querySelector('select[name="gender"]').value = gender;
-          document.querySelector('input[name="date_of_birth"]').value = birthDate;
-          document.querySelector('select[name="grade_level"]').value = gradeLevel;
-          document.querySelector('input[name="lrn"]').value = lrn;
-          document.querySelector('select[name="student_type"]').value = studentType;
-          document.querySelector('input[name="place_of_birth"]').value = placeOfBirth;
-          document.querySelector('input[name="nationality"]').value = 'Filipino';
-          document.querySelector('input[name="religion"]').value = religion;
-
-          // Fill Step 2: Contact Information
-          document.querySelector('input[name="email"]').value = email;
-          document.querySelector('input[name="contact_number"]').value = contactNumber;
-          document.querySelector('textarea[name="address"]').value = address;
-
-          // Fill Step 3: Emergency Contact
-          const emergencyContactName = getRandom(firstNames) + ' ' + getRandom(lastNames);
-          document.querySelector('input[name="emergency_contact_name"]').value = emergencyContactName;
-          document.querySelector('input[name="emergency_contact_number"]').value = emergencyContactNumber;
-          document.querySelector('input[name="emergency_contact_relationship"]').value = relationship;
-
-          // Fill Step 5: Account Information
-          const password = 'Demo123!';
-          document.querySelector('input[name="password"]').value = password;
-          document.querySelector('input[name="password_confirm"]').value = password;
-
-          // Show success message
-          showCustomAlert('✅ Demo data filled successfully!<br><br><strong>Password:</strong> Demo123!<br><br>Navigate through the steps to review all the auto-filled information.');
+        function validateNameField(input) {
+          // Remove any numbers and special characters, keep only letters, spaces, hyphens, and apostrophes
+          input.value = input.value.replace(/[^a-zA-Z\s\-\']/g, '');
         }
+
+        function validatePhoneField(input) {
+          // Remove any non-numeric characters except spaces, hyphens, parentheses, and plus sign
+          input.value = input.value.replace(/[^0-9\s\-\(\)\+]/g, '');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+          showStep(currentStep);
+
+          // Real-time password validation
+          const passwordField = document.getElementById('password');
+          const passwordConfirmField = document.getElementById('password_confirm');
+          const passwordHint = document.getElementById('password-hint');
+          const passwordMatchHint = document.getElementById('password-match-hint');
+          
+          function validatePassword() {
+            const password = passwordField.value;
+            if (password.length > 0 && password.length < 8) {
+              passwordHint.style.color = '#dc2626';
+              passwordHint.textContent = '❌ Password must be at least 8 characters';
+              passwordField.style.borderColor = '#dc2626';
+            } else if (password.length >= 8) {
+              passwordHint.style.color = '#16a34a';
+              passwordHint.textContent = '✓ Password length is valid';
+              passwordField.style.borderColor = '#16a34a';
+            } else {
+              passwordHint.style.color = 'rgba(255, 255, 255, 0.6)';
+              passwordHint.textContent = 'Minimum 8 characters';
+              passwordField.style.borderColor = '#e2e8f0';
+            }
+            validatePasswordMatch();
+          }
+          
+          function validatePasswordMatch() {
+            const password = passwordField.value;
+            const passwordConfirm = passwordConfirmField.value;
+            
+            if (passwordConfirm.length > 0) {
+              if (password !== passwordConfirm) {
+                passwordMatchHint.style.color = '#dc2626';
+                passwordMatchHint.textContent = '❌ Passwords do not match';
+                passwordConfirmField.style.borderColor = '#dc2626';
+              } else {
+                passwordMatchHint.style.color = '#16a34a';
+                passwordMatchHint.textContent = '✓ Passwords match';
+                passwordConfirmField.style.borderColor = '#16a34a';
+              }
+            } else {
+              passwordMatchHint.textContent = '';
+              passwordConfirmField.style.borderColor = '#e2e8f0';
+            }
+          }
+          
+          passwordField.addEventListener('input', validatePassword);
+          passwordField.addEventListener('blur', validatePassword);
+          passwordConfirmField.addEventListener('input', validatePasswordMatch);
+          passwordConfirmField.addEventListener('blur', validatePasswordMatch);
+          
+          // Initialize form validation
+          const form = document.getElementById('registrationForm');
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!validateAllSteps()) {
+              return;
+            }
+
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('password_confirm').value;
+
+            if (password !== passwordConfirm) {
+              currentStep = 4;
+              showStep(currentStep);
+              showCustomAlert('Passwords do not match. Please make sure both password fields are identical.');
+              return;
+            }
+
+            if (password.length < 8) {
+              currentStep = 4;
+              showStep(currentStep);
+              showCustomAlert('Password must be at least 8 characters long.');
+              return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> SUBMITTING...';
+            showSubmittingNotification();
+
+            HTMLFormElement.prototype.submit.call(form);
+          });
+        })
+
+
         </script>
       </div>
     </div>
   </div>
 </div>
 <?= $this->endSection() ?>
-

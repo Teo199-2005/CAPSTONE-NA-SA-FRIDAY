@@ -30,59 +30,60 @@ class DemoAccountsSeeder extends Seeder
             $exists = $tm->where('user_id', $teacherUserId)->first();
             if (! $exists) {
                 $tm->insert([
-                    'user_id' => $teacherUserId,
-                    'teacher_id' => 'DEMO-T001',
-                    'first_name' => 'Demo',
-                    'last_name' => 'Teacher',
-                    'gender' => 'Male',
-                    'email' => 'demo.teacher@lphs.edu',
+                    'user_id'           => $teacherUserId,
+                    'employee_id'       => 'DEMO-T001',
+                    'first_name'        => 'Demo',
+                    'last_name'         => 'Teacher',
+                    'gender'            => 'Male',
+                    'email'             => 'demo.teacher@lphs.edu',
                     'employment_status' => 'active',
                 ]);
             }
         }
 
-        // Student
+        $currentYear = date('Y');
+        $schoolYear  = $currentYear . '-' . ($currentYear + 1);
+
         $studentUserId = $this->createUserIfMissing($users, 'demo.student@lphs.edu', $password, 'student');
         if ($studentUserId) {
-            $sm = new StudentModel();
+            $sm     = new StudentModel();
             $exists = $sm->where('user_id', $studentUserId)->first();
             if (! $exists) {
                 $sm->insert([
-                    'user_id' => $studentUserId,
-                    'first_name' => 'Demo',
-                    'last_name' => 'Student',
-                    'gender' => 'Male',
-                    'date_of_birth' => '2010-01-01',
-                    'email' => 'demo.student@lphs.edu',
+                    'user_id'           => $studentUserId,
+                    'lrn'               => $this->nextLrn($db),
+                    'first_name'        => 'Demo',
+                    'last_name'         => 'Student',
+                    'gender'            => 'Male',
+                    'date_of_birth'     => date('Y-m-d', strtotime('-12 years')),
+                    'email'             => 'demo.student@lphs.edu',
                     'enrollment_status' => 'enrolled',
-                    'grade_level' => 7,
-                    'school_year' => '2024-2025',
-                    'student_id' => $sm->createUniqueStudentId(),
+                    'grade_level'       => 6,
+                    'school_year'       => $schoolYear,
                 ]);
             }
         }
 
-        // New Approved Student
         $newStudentUserId = $this->createUserIfMissing($users, 'new.student@lphs.edu', $password, 'student');
         if ($newStudentUserId) {
-            $sm = new StudentModel();
+            $sm     = new StudentModel();
             $exists = $sm->where('user_id', $newStudentUserId)->first();
             if (! $exists) {
                 $sm->insert([
-                    'user_id' => $newStudentUserId,
-                    'first_name' => 'John',
-                    'last_name' => 'Doe',
-                    'gender' => 'Male',
-                    'date_of_birth' => '2009-05-15',
-                    'email' => 'new.student@lphs.edu',
-                    'enrollment_status' => 'approved',
-                    'grade_level' => 8,
-                    'school_year' => '2024-2025',
-                    'student_id' => $sm->createUniqueStudentId(),
-                    'address' => '123 Main Street, City',
-                    'contact_number' => '09123456789',
-                    'emergency_contact_name' => 'Jane Doe',
-                    'emergency_contact_number' => '09987654321',
+                    'user_id'                        => $newStudentUserId,
+                    'lrn'                            => $this->nextLrn($db),
+                    'first_name'                     => 'John',
+                    'last_name'                      => 'Doe',
+                    'gender'                         => 'Male',
+                    'date_of_birth'                  => date('Y-m-d', strtotime('-11 years')),
+                    'email'                          => 'new.student@lphs.edu',
+                    'enrollment_status'              => 'pending',
+                    'grade_level'                    => 5,
+                    'school_year'                    => $schoolYear,
+                    'address'                        => '123 Main Street, City',
+                    'contact_number'                 => '09123456789',
+                    'emergency_contact_name'         => 'Jane Doe',
+                    'emergency_contact_number'       => '09987654321',
                     'emergency_contact_relationship' => 'Mother',
                 ]);
             }
@@ -106,22 +107,49 @@ class DemoAccountsSeeder extends Seeder
         }
     }
 
+    private function nextLrn($db): string
+    {
+        $row = $db->table('students')
+            ->select('lrn')
+            ->where('lrn IS NOT NULL', null, false)
+            ->orderBy('lrn', 'DESC')
+            ->limit(1)
+            ->get()
+            ->getRowArray();
+
+        return $row ? (string) (((int) $row['lrn']) + 1) : '136001000001';
+    }
+
     private function createUserIfMissing(UserModel $users, string $email, string $password, string $group): ?int
     {
         $db = \Config\Database::connect();
-        
-        // Check by email in users table
+
+        $identity = $db->table('auth_identities')
+            ->where('type', 'email_password')
+            ->where('secret', $email)
+            ->get()
+            ->getRowArray();
+
+        if ($identity) {
+            $userId = (int) $identity['user_id'];
+            $db->table('auth_groups_users')->ignore(true)->insert([
+                'user_id'    => $userId,
+                'group'      => $group,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            return $userId;
+        }
+
         $existing = $db->table('users')->where('email', $email)->get()->getRowArray();
         if ($existing) {
-            // Ensure group assignment
             $db->table('auth_groups_users')->ignore(true)->insert([
-                'user_id' => $existing['id'],
-                'group'   => $group,
+                'user_id'    => $existing['id'],
+                'group'      => $group,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
             return (int) $existing['id'];
         }
-        
+
         $user = new User([
             'email'    => $email,
             'password' => $password,
@@ -129,11 +157,10 @@ class DemoAccountsSeeder extends Seeder
         ]);
         $users->save($user);
         $id = (int) $users->getInsertID();
-        
-        // Link to group
+
         $db->table('auth_groups_users')->ignore(true)->insert([
-            'user_id' => $id,
-            'group'   => $group,
+            'user_id'    => $id,
+            'group'      => $group,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
         return $id;

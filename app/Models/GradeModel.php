@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -14,7 +13,7 @@ class GradeModel extends Model
     protected $protectFields = true;
     protected $allowedFields = [
         'student_id', 'subject_id', 'teacher_id', 'school_year',
-        'quarter', 'grade', 'remarks', 'date_recorded'
+        'term', 'grade', 'remarks', 'date_recorded'
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -36,7 +35,7 @@ class GradeModel extends Model
         'subject_id' => 'required|integer',
         'teacher_id' => 'required|integer',
         'school_year' => 'required|max_length[9]',
-        'quarter' => 'required|integer|greater_than[0]|less_than[5]',
+        'term' => 'required|integer|greater_than[0]|less_than[4]',
         'grade' => 'permit_empty|decimal|greater_than_equal_to[60]|less_than_equal_to[100]'
     ];
     protected $validationMessages = [];
@@ -66,17 +65,23 @@ class GradeModel extends Model
     }
 
     /**
-     * Get grades for a student in a specific quarter
+     * Get grades for a student in a specific term
      */
-    public function getStudentQuarterGrades($studentId, $schoolYear, $quarter)
+    public function getStudentTermGrades($studentId, $schoolYear, $term)
     {
-        return $this->select('grades.*, subjects.subject_name, subjects.subject_code, subjects.units')
-            ->join('subjects', 'subjects.id = grades.subject_id')
-            ->where('grades.student_id', $studentId)
-            ->where('grades.school_year', $schoolYear)
-            ->where('grades.quarter', $quarter)
-            ->orderBy('subjects.subject_name', 'ASC')
-            ->findAll();
+        $db = \Config\Database::connect();
+        return $db->query("
+            SELECT g.*, s.subject_name, s.subject_code, s.units
+            FROM grades g
+            JOIN subjects s ON s.id = g.subject_id
+            JOIN students st ON st.id = g.student_id
+            JOIN section_subjects ss ON ss.subject_id = s.id AND ss.section_id = st.section_id
+            WHERE g.student_id = ? 
+            AND g.school_year = ? 
+            AND g.term = ?
+            AND g.deleted_at IS NULL
+            ORDER BY s.subject_name ASC
+        ", [$studentId, $schoolYear, $term])->getResultArray();
     }
 
     /**
@@ -84,25 +89,30 @@ class GradeModel extends Model
      */
     public function getStudentYearGrades($studentId, $schoolYear)
     {
-        return $this->select('grades.*, subjects.subject_name, subjects.subject_code, subjects.units')
-            ->join('subjects', 'subjects.id = grades.subject_id')
-            ->where('grades.student_id', $studentId)
-            ->where('grades.school_year', $schoolYear)
-            ->orderBy('subjects.subject_name', 'ASC')
-            ->orderBy('grades.quarter', 'ASC')
-            ->findAll();
+        $db = \Config\Database::connect();
+        return $db->query("
+            SELECT g.*, s.subject_name, s.subject_code, s.units
+            FROM grades g
+            JOIN subjects s ON s.id = g.subject_id
+            JOIN students st ON st.id = g.student_id
+            JOIN section_subjects ss ON ss.subject_id = s.id AND ss.section_id = st.section_id
+            WHERE g.student_id = ? 
+            AND g.school_year = ?
+            AND g.deleted_at IS NULL
+            ORDER BY s.subject_name ASC, g.term ASC
+        ", [$studentId, $schoolYear])->getResultArray();
     }
 
     /**
-     * Calculate quarter average for a student
+     * Calculate term average for a student
      */
-    public function getQuarterAverage($studentId, $schoolYear, $quarter)
+    public function getTermAverage($studentId, $schoolYear, $term)
     {
         $grades = $this->select('grades.grade, subjects.units')
             ->join('subjects', 'subjects.id = grades.subject_id')
             ->where('grades.student_id', $studentId)
             ->where('grades.school_year', $schoolYear)
-            ->where('grades.quarter', $quarter)
+            ->where('grades.term', $term)
             ->where('grades.grade IS NOT NULL')
             ->findAll();
 
@@ -118,7 +128,11 @@ class GradeModel extends Model
             $totalUnits += $grade['units'];
         }
 
-        return $totalUnits > 0 ? round($totalWeightedGrades / $totalUnits, 2) : null;
+        $average = $totalUnits > 0 ? round($totalWeightedGrades / $totalUnits, 2) : null;
+
+        log_message('debug', "Term Average Calculation - Student: $studentId, Term: $term, Total Weighted: $totalWeightedGrades, Total Units: $totalUnits, Average: $average");
+
+        return $average;
     }
 
     /**
@@ -126,26 +140,26 @@ class GradeModel extends Model
      */
     public function getFinalAverage($studentId, $schoolYear)
     {
-        $quarterAverages = [];
-        
-        for ($quarter = 1; $quarter <= 4; $quarter++) {
-            $average = $this->getQuarterAverage($studentId, $schoolYear, $quarter);
+        $termAverages = [];
+
+        for ($term = 1; $term <= 3; $term++) {
+            $average = $this->getTermAverage($studentId, $schoolYear, $term);
             if ($average !== null) {
-                $quarterAverages[] = $average;
+                $termAverages[] = $average;
             }
         }
 
-        if (empty($quarterAverages)) {
+        if (empty($termAverages)) {
             return null;
         }
 
-        return round(array_sum($quarterAverages) / count($quarterAverages), 2);
+        return round(array_sum($termAverages) / count($termAverages), 2);
     }
 
     /**
      * Get grades for a teacher's subject
      */
-    public function getTeacherSubjectGrades($teacherId, $subjectId, $schoolYear, $quarter = null)
+    public function getTeacherSubjectGrades($teacherId, $subjectId, $schoolYear, $term = null)
     {
         $builder = $this->select('grades.*, students.first_name, students.last_name, students.student_id as student_number')
             ->join('students', 'students.id = grades.student_id')
@@ -153,8 +167,8 @@ class GradeModel extends Model
             ->where('grades.subject_id', $subjectId)
             ->where('grades.school_year', $schoolYear);
 
-        if ($quarter) {
-            $builder->where('grades.quarter', $quarter);
+        if ($term) {
+            $builder->where('grades.term', $term);
         }
 
         return $builder->orderBy('students.last_name', 'ASC')
@@ -163,14 +177,14 @@ class GradeModel extends Model
     }
 
     /**
-     * Get class average for a subject and quarter
+     * Get class average for a subject and term
      */
-    public function getClassAverage($subjectId, $schoolYear, $quarter)
+    public function getClassAverage($subjectId, $schoolYear, $term)
     {
         $result = $this->select('AVG(grade) as average')
             ->where('subject_id', $subjectId)
             ->where('school_year', $schoolYear)
-            ->where('quarter', $quarter)
+            ->where('term', $term)
             ->where('grade IS NOT NULL')
             ->first();
 
@@ -180,12 +194,12 @@ class GradeModel extends Model
     /**
      * Get grade distribution for a subject
      */
-    public function getGradeDistribution($subjectId, $schoolYear, $quarter)
+    public function getGradeDistribution($subjectId, $schoolYear, $term)
     {
         $grades = $this->select('grade')
             ->where('subject_id', $subjectId)
             ->where('school_year', $schoolYear)
-            ->where('quarter', $quarter)
+            ->where('term', $term)
             ->where('grade IS NOT NULL')
             ->findAll();
 
@@ -199,7 +213,7 @@ class GradeModel extends Model
 
         foreach ($grades as $grade) {
             $gradeValue = $grade['grade'];
-            
+
             if ($gradeValue >= 90) {
                 $distribution['excellent']++;
             } elseif ($gradeValue >= 85) {
@@ -217,14 +231,14 @@ class GradeModel extends Model
     }
 
     /**
-     * Check if grade exists for student, subject, and quarter
+     * Check if grade exists for student, subject, and term
      */
-    public function gradeExists($studentId, $subjectId, $schoolYear, $quarter)
+    public function gradeExists($studentId, $subjectId, $schoolYear, $term)
     {
         return $this->where('student_id', $studentId)
             ->where('subject_id', $subjectId)
             ->where('school_year', $schoolYear)
-            ->where('quarter', $quarter)
+            ->where('term', $term)
             ->first() !== null;
     }
 
@@ -236,25 +250,32 @@ class GradeModel extends Model
         $existing = $this->where('student_id', $data['student_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('school_year', $data['school_year'])
-            ->where('quarter', $data['quarter'])
+            ->where('term', $data['term'])
             ->first();
 
         if ($existing) {
-            return $this->update($existing['id'], $data);
+            // Update existing grade
+            $updateData = array_merge($data, ['updated_at' => date('Y-m-d H:i:s')]);
+            return $this->update($existing['id'], $updateData);
         } else {
-            return $this->insert($data);
+            // Insert new grade
+            $insertData = array_merge($data, [
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+            return $this->insert($insertData);
         }
     }
 
     /**
-     * Get student ranking in class for a quarter
+     * Get student ranking in class for a term
      */
-    public function getStudentRanking($studentId, $schoolYear, $quarter)
+    public function getStudentRanking($studentId, $schoolYear, $term)
     {
         // Get all students in the same grade level and section
         $studentModel = new StudentModel();
         $student = $studentModel->find($studentId);
-        
+
         if (!$student) {
             return null;
         }
@@ -265,9 +286,9 @@ class GradeModel extends Model
             ->findAll();
 
         $rankings = [];
-        
+
         foreach ($classmates as $classmate) {
-            $average = $this->getQuarterAverage($classmate['id'], $schoolYear, $quarter);
+            $average = $this->getTermAverage($classmate['id'], $schoolYear, $term);
             if ($average !== null) {
                 $rankings[] = [
                     'student_id' => $classmate['id'],

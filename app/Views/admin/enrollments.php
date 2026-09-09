@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <style>
@@ -496,7 +496,7 @@ body.modal-open {
 </style>
 <div class="enrollments-page-content">
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3">Manage Enrollments</h1>
+  <h1 class="h3">Registration Applications</h1>
   <div>
     <a href="<?= base_url('admin/dashboard') ?>" class="btn btn-outline-secondary">Back to Dashboard</a>
   </div>
@@ -516,9 +516,9 @@ body.modal-open {
     <label class="form-label">Grade</label>
     <select name="grade" class="form-select" onchange="this.form.submit()">
       <option value="">All</option>
-      <?php for ($g=7; $g<=10; $g++): ?>
-        <option value="<?= $g ?>" <?= ($gradeLevel==$g?'selected':'') ?>>Grade <?= $g ?></option>
-      <?php endfor; ?>
+      <?php foreach (grade_level_options() as $g): ?>
+        <option value="<?= $g ?>" <?= ($gradeLevel==$g?'selected':'') ?>><?= esc(grade_level_label($g)) ?></option>
+      <?php endforeach; ?>
     </select>
   </div>
 </form>
@@ -542,7 +542,7 @@ body.modal-open {
             <?php foreach ($students as $st): ?>
               <tr>
                 <td><?= esc($st['first_name'].' '.$st['last_name']) ?></td>
-                <td>Grade <?= esc($st['grade_level']) ?></td>
+                <td><?= esc(grade_level_label((int) ($st['grade_level'] ?? 0))) ?></td>
                 <td><?= esc($st['section_name'] ?? '—') ?></td>
                 <td><span class="badge bg-<?= $st['enrollment_status']==='pending'?'warning':($st['enrollment_status']==='approved'?'info':($st['enrollment_status']==='enrolled'?'success':'secondary')) ?>">
                   <?= ucfirst(esc($st['enrollment_status'])) ?></span></td>
@@ -609,7 +609,7 @@ body.modal-open {
     <div class="custom-modal-header approval">
       <h5>
         <i class="bi bi-check-circle"></i>
-        Approve Enrollment
+        Approve Registration
       </h5>
       <button type="button" class="custom-modal-close" onclick="closeApprovalModal()">
         <i class="bi bi-x-lg"></i>
@@ -644,7 +644,7 @@ body.modal-open {
           <i class="bi bi-x-circle"></i> Cancel
         </button>
         <button type="submit" class="btn btn-success">
-          <i class="bi bi-check-circle"></i> Approve Enrollment
+          <i class="bi bi-check-circle"></i> Approve Registration
         </button>
       </div>
     </form>
@@ -658,7 +658,7 @@ body.modal-open {
     <div class="custom-modal-header rejection">
       <h5>
         <i class="bi bi-x-circle"></i>
-        Reject Enrollment
+        Reject Registration
       </h5>
       <button type="button" class="custom-modal-close" onclick="closeRejectionModal()">
         <i class="bi bi-x-lg"></i>
@@ -698,7 +698,7 @@ body.modal-open {
           <i class="bi bi-arrow-left"></i> Cancel
         </button>
         <button type="submit" class="btn btn-danger">
-          <i class="bi bi-x-circle"></i> Reject Enrollment
+          <i class="bi bi-x-circle"></i> Reject Registration
         </button>
       </div>
     </form>
@@ -801,9 +801,9 @@ function viewStudent(studentId) {
 
     <div class="row mt-3">
       <div class="col-12">
-        <h6 class="text-primary mb-3">Enrollment Information</h6>
+        <h6 class="text-primary mb-3">Application Information</h6>
         <table class="table table-sm">
-          <tr><td><strong>Grade Level:</strong></td><td>Grade ${student.grade_level}</td></tr>
+          <tr><td><strong>Grade Level:</strong></td><td>${formatGradeLevel(student.grade_level)}</td></tr>
           <tr><td><strong>Section:</strong></td><td>${student.section_name || 'Not assigned'}</td></tr>
           <tr><td><strong>School Year:</strong></td><td>${student.school_year || 'N/A'}</td></tr>
           <tr><td><strong>Status:</strong></td><td><span class="badge bg-${student.enrollment_status === 'pending' ? 'warning' : (student.enrollment_status === 'approved' ? 'info' : (student.enrollment_status === 'enrolled' ? 'success' : 'secondary'))}">${student.enrollment_status.charAt(0).toUpperCase() + student.enrollment_status.slice(1)}</span></td></tr>
@@ -833,7 +833,7 @@ function showApprovalModal(studentId, gradeLevel) {
   const studentInfo = `
     <div class="student-name">${student.first_name} ${student.middle_name || ''} ${student.last_name}</div>
     <div class="student-meta">
-      <i class="bi bi-mortarboard"></i> Grade ${student.grade_level} •
+      <i class="bi bi-mortarboard"></i> ${formatGradeLevel(student.grade_level)} •
       <i class="bi bi-calendar-event"></i> Applied: ${student.created_at ? new Date(student.created_at).toLocaleDateString() : 'N/A'}
     </div>
     <div class="student-status" style="background: #fef3c7; color: #92400e; border: 1px solid #fbbf24;">
@@ -892,7 +892,7 @@ function showRejectionModal(studentId) {
   const studentInfo = `
     <div class="student-name">${student.first_name} ${student.middle_name || ''} ${student.last_name}</div>
     <div class="student-meta">
-      <i class="bi bi-mortarboard"></i> Grade ${student.grade_level} •
+      <i class="bi bi-mortarboard"></i> ${formatGradeLevel(student.grade_level)} •
       <i class="bi bi-calendar-event"></i> Applied: ${student.created_at ? new Date(student.created_at).toLocaleDateString() : 'N/A'}
     </div>
     <div class="student-status" style="background: #fef3c7; color: #92400e; border: 1px solid #fbbf24;">
@@ -1013,10 +1013,10 @@ function loadStudentDetailsContent(studentId) {
         <div class="student-info-section">
           <div class="student-info-title">
             <i class="bi bi-mortarboard"></i>
-            Enrollment Information
+            Application Information
           </div>
           <table class="student-details-table">
-            <tr><td>Grade Level:</td><td>Grade ${student.grade_level}</td></tr>
+            <tr><td>Grade Level:</td><td>${formatGradeLevel(student.grade_level)}</td></tr>
             <tr><td>Section:</td><td>${student.section_name || 'Not assigned'}</td></tr>
             <tr><td>School Year:</td><td>${student.school_year || 'N/A'}</td></tr>
             <tr><td>Status:</td><td><span class="badge bg-${student.enrollment_status === 'pending' ? 'warning' : (student.enrollment_status === 'approved' ? 'info' : (student.enrollment_status === 'enrolled' ? 'success' : 'secondary'))}">${student.enrollment_status.charAt(0).toUpperCase() + student.enrollment_status.slice(1)}</span></td></tr>

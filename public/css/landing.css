@@ -1,7 +1,22 @@
 /* Landing Page Styles - Scoped to #landing to avoid dashboard conflicts */
 
 #landing {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  background-color: #0b1530;
+}
+
+#landing body, #landing main {
+  background-color: #0b1530 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#landing .hero {
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  background: #0b1530 !important;
+  margin-bottom: 0 !important;
 }
 
 /* Section Dividers */
@@ -32,17 +47,81 @@
   background: #2563eb;
 }
 
-/* Hero Section */
+/* Hero — herosouth.png banner (1983×793, 2.5:1); sizing in landing.php */
 #landing .hero {
-  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  background-color: #0b1530;
   color: white;
-  padding: 4rem 0;
+  padding: 0;
   text-align: center;
   position: relative;
   overflow: hidden;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
   display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+#landing .hero-slideshow__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b1530;
+  overflow: hidden;
+  z-index: 0;
+}
+
+#landing .hero-inner {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+#landing .hero-slideshow__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b1530;
+  overflow: hidden;
+}
+
+#landing .hero-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#landing .hero-slide.is-active {
+  opacity: 1;
+  z-index: 1;
+}
+
+#landing .hero-banner-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  vertical-align: top;
+  background: #0b1530;
 }
 
 #landing .hero-background-image {
@@ -52,8 +131,8 @@
   right: 0;
   bottom: 0;
   background: url('https://images.pexels.com/photos/5905709/pexels-photo-5905709.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1') center/cover;
-  opacity: 0.6;
-  filter: brightness(0.7) contrast(1.1);
+  opacity: 0.72;
+  filter: brightness(0.82) contrast(1.06);
   animation: heroZoom 20s ease-in-out infinite alternate;
 }
 
@@ -68,7 +147,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(30, 64, 175, 0.7) 0%, rgba(30, 58, 138, 0.7) 100%);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.12) 0%, rgba(30, 58, 138, 0.2) 100%);
   z-index: 1;
 }
 
@@ -832,13 +911,10 @@
   right: 0;
   bottom: 0;
   background:
-    url('/assets/images/backgrounds/lphs (3).jpeg') center/cover,
     linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
     linear-gradient(0deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: auto, 30px 30px;
-  background-blend-mode: overlay;
-  opacity: 0.6;
-  filter: brightness(0.7) contrast(1.1);
+  background-size: 30px 30px;
+  opacity: 0.4;
 }
 
 #landing .cta-content {
@@ -1058,13 +1134,20 @@
 #landing .section-title::before { content: none !important; display: none !important; }
 
 
-/* Formal heading typography and hover accents */
-#landing h1, #landing h2, #landing h3, #landing h4,
-#landing .section-title, #landing .hero-title, #landing .cta-title,
+/* Heading typography — same sans stack as app */
+#landing h1, #landing h2,
+#landing .section-title, #landing .hero-title, #landing .cta-title {
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  transition: color .25s ease, text-shadow .25s ease;
+}
+
+#landing h3, #landing h4,
 #landing .feature-title, #landing .process-step-title {
-  font-family: 'Times New Roman', Times, serif !important;
+  font-family: inherit;
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
   transition: color .25s ease, text-shadow .25s ease;
 }
 
@@ -1091,7 +1174,7 @@
 
 
 /* Hero title hover (subtle) */
-#landing .hero-title { font-family: 'Times New Roman', Times, serif !important; }
+#landing .hero-title { font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
 #landing .hero-title:hover { text-shadow: 0 6px 16px rgba(0,0,0,0.35); color: #ffffff; }
 
 /* Wider containers for landing page */
@@ -1133,38 +1216,12 @@
   margin-right: auto !important;
 }
 
-/* Scroll animations */
-#landing .scroll-animate {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.6s ease-out;
-}
-
-#landing .scroll-animate.animate {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-#landing .scroll-animate-left {
-  opacity: 0;
-  transform: translateX(-30px);
-  transition: all 0.6s ease-out;
-}
-
-#landing .scroll-animate-left.animate {
-  opacity: 1;
-  transform: translateX(0);
-}
-
+/* Scroll animation placeholders – visible by default (no JS required) */
+#landing .scroll-animate,
+#landing .scroll-animate-left,
 #landing .scroll-animate-right {
-  opacity: 0;
-  transform: translateX(30px);
-  transition: all 0.6s ease-out;
-}
-
-#landing .scroll-animate-right.animate {
   opacity: 1;
-  transform: translateX(0);
+  transform: none;
 }
 
 /* Responsive Design for Enrollment Process */

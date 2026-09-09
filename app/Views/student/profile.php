@@ -1,4 +1,4 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
 
 <style>
@@ -84,6 +84,19 @@
   </div>
 <?php endif; ?>
 
+<?php
+helper('nutrition');
+$nutritionIncomplete = ! \App\Models\StudentModel::isNutritionProfileComplete($student);
+?>
+<?php if ($nutritionIncomplete): ?>
+  <div class="alert alert-warning border-0 shadow-sm d-flex align-items-start gap-3 mb-4" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0"></i>
+    <div>
+      <strong>Action required:</strong> Enter your <strong>height (cm)</strong>, <strong>weight (kg)</strong>, and <strong>ethnicity</strong> below. This information is used by the school for health screening and planning only—not a medical diagnosis.
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="row">
   <!-- Profile Information -->
   <div class="col-lg-8">
@@ -132,12 +145,70 @@
               <div class="col-md-6 mb-3">
                 <label for="phone" class="form-label">Phone Number</label>
                 <input type="text" class="form-control" id="phone" name="phone" 
-                       value="<?= esc($student['phone'] ?? '') ?>">
+                       value="<?= esc(old('phone', $student['contact_number'] ?? $student['phone'] ?? '')) ?>">
               </div>
             </div>
             <div class="mb-3">
               <label for="address" class="form-label">Address</label>
               <textarea class="form-control" id="address" name="address" rows="2"><?= esc($student['address'] ?? '') ?></textarea>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h5><i class="bi bi-heart-pulse me-2"></i>Health / nutrition (required)</h5>
+            <p class="text-muted small mb-3">Used for school wellness records. BMI is estimated from your height and weight using WHO growth references for your age and sex where applicable.</p>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label for="height_cm" class="form-label">Height (cm) <?= $nutritionIncomplete ? '<span class="text-danger">*</span>' : '' ?></label>
+                <input type="number" step="0.1" min="80" max="250" class="form-control" id="height_cm" name="height_cm"
+                       value="<?= esc(old('height_cm', $student['height_cm'] ?? '')) ?>" placeholder="e.g. 165">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label for="weight_kg" class="form-label">Weight (kg) <?= $nutritionIncomplete ? '<span class="text-danger">*</span>' : '' ?></label>
+                <input type="number" step="0.1" min="15" max="200" class="form-control" id="weight_kg" name="weight_kg"
+                       value="<?= esc(old('weight_kg', $student['weight_kg'] ?? '')) ?>" placeholder="e.g. 52">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label for="ethnicity" class="form-label">Ethnicity <?= $nutritionIncomplete ? '<span class="text-danger">*</span>' : '' ?></label>
+                <select class="form-select" id="ethnicity" name="ethnicity">
+                  <option value="">— Select —</option>
+                  <?php
+                  $ethVal = old('ethnicity', $student['ethnicity'] ?? '');
+                  foreach (student_ethnicity_options() as $val => $label): ?>
+                    <option value="<?= esc($val) ?>" <?= (string) $ethVal === (string) $val ? 'selected' : '' ?>><?= esc($label) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <span class="text-muted small">Age (from school record):</span>
+                <?php
+                $ageY = '';
+                if (! empty($student['date_of_birth'])) {
+                    try {
+                        $dob = new \DateTimeImmutable($student['date_of_birth']);
+                        $ageY = (string) $dob->diff(new \DateTimeImmutable('today'))->y;
+                    } catch (\Throwable) {
+                        $ageY = '—';
+                    }
+                } else {
+                    $ageY = '—';
+                }
+                ?>
+                <strong><?= esc($ageY !== '' ? $ageY . ' years' : '—') ?></strong>
+              </div>
+              <div class="col-md-6 mb-2">
+                <span class="text-muted small">Screening category:</span>
+                <?php if (! empty($student['nutrition_status'])): ?>
+                  <span class="badge bg-secondary"><?= esc(\App\Libraries\StudentNutritionClassifier::statusLabel($student['nutrition_status'])) ?></span>
+                  <?php if (! empty($student['bmi'])): ?>
+                    <span class="small text-muted ms-1">BMI <?= esc((string) $student['bmi']) ?></span>
+                  <?php endif; ?>
+                <?php else: ?>
+                  <span class="text-muted">— complete all three fields above</span>
+                <?php endif; ?>
+              </div>
             </div>
           </div>
 
@@ -163,7 +234,7 @@
         </h5>
       </div>
       <div class="card-body">
-        <form action="<?= base_url('student/profile/change-password') ?>" method="post">
+        <form id="changePasswordForm" action="<?= base_url('student/profile/change-password') ?>" method="post">
           <?= csrf_field() ?>
           
           <div class="mb-3">
@@ -180,12 +251,12 @@
             <label for="new_password" class="form-label">New Password</label>
             <div style="position: relative;">
               <input type="password" class="form-control" id="new_password" name="new_password" 
-                     minlength="6" required>
+                     minlength="8" required>
               <button type="button" id="toggleNewPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: #6c757d;">
                 <i class="bi bi-eye" id="newEyeIcon"></i>
               </button>
             </div>
-            <div class="form-text">Minimum 6 characters</div>
+            <div class="form-text">Minimum 8 characters</div>
           </div>
           
           <div class="mb-3">
@@ -198,7 +269,7 @@
             </div>
           </div>
           
-          <button type="submit" class="btn btn-warning w-100">
+          <button type="button" class="btn btn-warning w-100" onclick="confirmPasswordChange()">
             <i class="bi bi-key me-2"></i>Change Password
           </button>
         </form>
@@ -219,7 +290,7 @@
         </div>
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="text-muted">Grade Level</span>
-          <span class="fw-bold">Grade <?= esc($student['grade_level']) ?></span>
+          <span class="fw-bold"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></span>
         </div>
         <?php if (!empty($student['section_name'])): ?>
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -236,7 +307,56 @@
   </div>
 </div>
 
+<div class="modal fade" id="confirmPasswordModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Confirm Password Change</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to change your password?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #495057; color: white;">Cancel</button>
+        <button type="button" class="btn btn-warning" onclick="submitPasswordChange()">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+#confirmPasswordModal {
+  z-index: 99999 !important;
+}
+#confirmPasswordModal ~ .modal-backdrop {
+  z-index: 99998 !important;
+}
+</style>
+
 <script>
+function confirmPasswordChange() {
+  const form = document.getElementById('changePasswordForm');
+  if (form.checkValidity()) {
+    const newPass = document.getElementById('new_password').value;
+    const confirmPass = document.getElementById('confirm_password').value;
+    if (newPass !== confirmPass) {
+      alert('New password and confirm password do not match!');
+      return;
+    }
+    const modalEl = document.getElementById('confirmPasswordModal');
+    document.body.appendChild(modalEl);
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  } else {
+    form.reportValidity();
+  }
+}
+
+function submitPasswordChange() {
+  document.getElementById('changePasswordForm').submit();
+}
+
 // Password toggle functionality
 document.getElementById('toggleCurrentPassword').addEventListener('click', function() {
   const passwordInput = document.getElementById('current_password');

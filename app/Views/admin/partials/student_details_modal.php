@@ -1,4 +1,4 @@
-<div class="row">
+﻿<div class="row">
   <div class="col-md-6">
     <div class="student-info-section">
       <div class="student-info-title">
@@ -49,160 +49,79 @@
     <div class="student-info-section">
       <div class="student-info-title">
         <i class="bi bi-mortarboard"></i>
-        Enrollment Information
+        Application Information
       </div>
       <table class="student-details-table">
-        <tr><td>Grade Level:</td><td>Grade <?= esc($student['grade_level']) ?></td></tr>
+        <tr><td>Grade Level:</td><td><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></td></tr>
         <tr><td>Section:</td><td><?= esc($student['section_name'] ?? 'Not assigned') ?></td></tr>
         <tr><td>School Year:</td><td><?= esc($student['school_year'] ?? 'N/A') ?></td></tr>
         <tr><td>Status:</td><td>
-          <span class="badge bg-<?= $student['enrollment_status'] === 'pending' ? 'warning' : ($student['enrollment_status'] === 'approved' ? 'info' : ($student['enrollment_status'] === 'enrolled' ? 'success' : 'secondary')) ?>">
-            <?= ucfirst(esc($student['enrollment_status'])) ?>
+          <?php 
+          $statusColors = [
+            'pending' => 'warning',
+            'approved' => 'info', 
+            'enrolled' => 'success',
+            'graduated' => 'primary',
+            'transferred' => 'dark',
+            'rejected' => 'danger',
+            'dropped' => 'secondary'
+          ];
+          $statusColor = $statusColors[$student['enrollment_status']] ?? 'secondary';
+          ?>
+          <span class="badge bg-<?= $statusColor ?>">
+            <?= ucfirst(esc($student['enrollment_status'] ?? 'Unknown')) ?>
           </span>
         </td></tr>
-        <tr><td>Enrollment Date:</td><td><?= $student['created_at'] ? date('M j, Y', strtotime($student['created_at'])) : 'N/A' ?></td></tr>
+        <tr><td>Submitted Date:</td><td><?= $student['created_at'] ? date('M j, Y', strtotime($student['created_at'])) : 'N/A' ?></td></tr>
       </table>
     </div>
   </div>
 </div>
 
-<?php if (!empty($documents)): ?>
+<?php if (!empty($student['section_id'])): ?>
 <div class="row">
   <div class="col-12">
     <div class="student-info-section">
       <div class="student-info-title">
-        <i class="bi bi-file-earmark-text"></i>
-        Required Documents
+        <i class="bi bi-book"></i>
+        Enrolled Subjects
       </div>
-      <div class="documents-grid">
-        <?php 
-        $documentTypes = [
-          'birth_certificate' => ['label' => 'Birth Certificate', 'icon' => 'bi-file-earmark-person'],
-          'report_card' => ['label' => 'Report Card (Form 138)', 'icon' => 'bi-file-earmark-bar-graph'],
-          'good_moral' => ['label' => 'Good Moral Certificate', 'icon' => 'bi-file-earmark-check'],
-          'photo' => ['label' => '2x2 Photo', 'icon' => 'bi-person-square']
-        ];
-        ?>
-        
-        <?php foreach ($documentTypes as $type => $info): ?>
-          <div class="document-item">
-            <div class="document-header">
-              <i class="bi <?= $info['icon'] ?>"></i>
-              <span class="document-label"><?= $info['label'] ?></span>
+      <?php 
+      $db = \Config\Database::connect();
+      $subjects = $db->query(
+        "SELECT s.id, s.subject_name, s.subject_code 
+         FROM subjects s
+         JOIN section_subjects ss ON ss.subject_id = s.id
+         WHERE ss.section_id = ? AND s.grade_level = ?
+         ORDER BY s.subject_name",
+        [$student['section_id'], $student['grade_level']]
+      )->getResultArray();
+      $excludedSubjects = !empty($student['excluded_subjects']) ? explode(',', $student['excluded_subjects']) : [];
+      $subjects = array_filter($subjects, fn($s) => !in_array($s['id'], $excludedSubjects));
+      ?>
+      <?php if (!empty($subjects)): ?>
+        <div class="subjects-grid">
+          <?php foreach ($subjects as $subject): ?>
+            <div class="subject-card">
+              <div class="subject-icon">
+                <i class="bi bi-journal-text"></i>
+              </div>
+              <div class="subject-info">
+                <div class="subject-name"><?= esc($subject['subject_name']) ?></div>
+                <div class="subject-code"><?= esc($subject['subject_code']) ?></div>
+              </div>
             </div>
-            <?php if (isset($documents[$type])): ?>
-              <div class="document-preview">
-                <?php
-                $doc = $documents[$type];
-                $fileName = basename($doc['file_path']);
-
-                // Check the correct file location - use multiple methods to ensure compatibility
-                $filePath = null;
-                $fileExists = false;
-                
-                // Try different path methods
-                if (defined('FCPATH')) {
-                    $filePath = FCPATH . 'uploads/enrollment_documents/' . $fileName;
-                    $fileExists = file_exists($filePath);
-                }
-                
-                // Fallback method if FCPATH doesn't work
-                if (!$fileExists) {
-                    $filePath = ROOTPATH . 'public/uploads/enrollment_documents/' . $fileName;
-                    $fileExists = file_exists($filePath);
-                }
-                
-                // Another fallback using relative path from app root
-                if (!$fileExists) {
-                    $filePath = dirname(dirname(dirname(__DIR__))) . '/public/uploads/enrollment_documents/' . $fileName;
-                    $fileExists = file_exists($filePath);
-                }
-                $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-                // Use the filename for the URL
-                $fileUrl = base_url('uploads/enrollment_documents/' . $fileName);
-                ?>
-
-                <?php if ($fileExists): ?>
-                  <?php if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
-                    <a href="<?= base_url('admin/students/document/' . $fileName) ?>" class="image-preview" style="cursor: pointer; text-decoration: none;">
-                      <img src="<?= $fileUrl ?>"
-                           alt="<?= $info['label'] ?>"
-                           class="document-thumbnail"
-                           onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';">
-                      <div class="document-overlay">
-                        <i class="bi bi-eye"></i>
-                        <span>Click to view</span>
-                      </div>
-                    </a>
-                  <?php else: ?>
-                    <div class="file-preview">
-                      <i class="bi bi-file-earmark-pdf"></i>
-                      <span class="file-name"><?= esc($doc['document_name']) ?></span>
-                      <a href="<?= $fileUrl ?>"
-                         target="_blank"
-                         class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-download"></i> Download
-                      </a>
-                    </div>
-                  <?php endif; ?>
-                  
-                  <div class="document-info">
-                    <small class="text-muted">
-                      Uploaded: <?= date('M j, Y', strtotime($doc['created_at'])) ?>
-                    </small>
-                  </div>
-                <?php else: ?>
-                  <div class="document-missing">
-                    <i class="bi bi-exclamation-triangle text-warning"></i>
-                    <span class="text-warning">File not found</span>
-                  </div>
-                <?php endif; ?>
-              </div>
-            <?php else: ?>
-              <div class="document-missing">
-                <i class="bi bi-x-circle text-danger"></i>
-                <span class="text-muted">Not submitted</span>
-              </div>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
-      </div>
-    </div>
-  </div>
-</div>
-<?php else: ?>
-<div class="row">
-  <div class="col-12">
-    <div class="student-info-section">
-      <div class="student-info-title">
-        <i class="bi bi-file-earmark-text"></i>
-        Required Documents
-      </div>
-      <div class="alert alert-info">
-        <i class="bi bi-info-circle"></i>
-        No documents have been submitted for this student.
-      </div>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div class="alert alert-info mb-0">
+          <i class="bi bi-info-circle"></i> No subjects assigned to this section yet.
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 </div>
 <?php endif; ?>
-
-<!-- Document Viewer Modal -->
-<div id="documentViewerModal" class="document-viewer-modal" style="display: none;">
-  <div class="document-viewer-overlay" onclick="closeDocumentModal()"></div>
-  <div class="document-viewer-content">
-    <div class="document-viewer-header">
-      <h5 id="documentViewerTitle">Document Viewer</h5>
-      <button type="button" class="document-viewer-close" onclick="closeDocumentModal()">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    <div class="document-viewer-body">
-      <img id="documentViewerImage" src="" alt="Document" class="document-viewer-image">
-    </div>
-  </div>
-</div>
 
 <style>
 /* Student Details Table */
@@ -229,6 +148,71 @@
 
 .student-details-table tr:last-child td {
   border-bottom: none;
+}
+
+/* Subjects Grid Styles */
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.subject-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.subject-card:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.1);
+}
+
+.subject-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b82f6;
+  color: white;
+  border-radius: 8px;
+  font-size: 1.2rem;
+}
+
+.subject-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.subject-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject-code {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.subject-info .badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
 }
 
 /* Documents Grid Styles */

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 use CodeIgniter\Controller;
@@ -35,7 +34,7 @@ abstract class BaseController extends Controller
      *
      * @var list<string>
      */
-    protected $helpers = [];
+    protected $helpers = ['school_year', 'grade_level'];
 
     /**
      * Be sure to declare properties for any property fetch you initialized.
@@ -54,5 +53,23 @@ abstract class BaseController extends Controller
         // Preload any models, libraries, etc, here.
 
         // E.g.: $this->session = service('session');
+    }
+
+    /**
+     * Send a dompdf document through CodeIgniter's response (fixes raw %PDF text on shared hosting).
+     */
+    protected function sendPdfInline(\Dompdf\Dompdf $dompdf, string $filename, bool $download = false): ResponseInterface
+    {
+        $safeName = preg_replace('/[^\w\-\.]+/', '_', basename($filename)) ?: 'document.pdf';
+        $pdf      = $dompdf->output();
+        $disposition = ($download ? 'attachment' : 'inline') . '; filename="' . $safeName . '"';
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', $disposition)
+            ->setHeader('Content-Length', (string) strlen($pdf))
+            ->setHeader('Cache-Control', 'private, max-age=0, must-revalidate')
+            ->setBody($pdf);
     }
 }

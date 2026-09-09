@@ -93,7 +93,7 @@
             <?php 
             $sections = [];
             foreach ($students as $student) {
-                $sectionKey = $student['grade_level'] . ' - ' . $student['section_name'];
+                $sectionKey = grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name'];
                 if (!in_array($sectionKey, $sections)) {
                     $sections[] = $sectionKey;
                 }
@@ -170,12 +170,12 @@
                 <?php 
                 $currentStatus = $attendanceData[$student['id']]['status'] ?? 'present';
                 ?>
-                <div class="card student-card <?= $currentStatus ?>" data-student="<?= $student['id'] ?>" data-section="<?= esc($student['grade_level'] . ' - ' . $student['section_name']) ?>">
+                <div class="card student-card <?= $currentStatus ?>" data-student="<?= $student['id'] ?>" data-section="<?= esc(grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name']) ?>">
                     <div class="card-body p-3 text-center">
                         <div class="mb-2">
                             <strong class="d-block"><?= esc($student['first_name'] . ' ' . $student['last_name']) ?></strong>
                             <small class="text-muted"><?= esc($student['lrn']) ?></small>
-                            <small class="d-block text-muted"><?= esc($student['grade_level'] . ' - ' . $student['section_name']) ?></small>
+                            <small class="d-block text-muted"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name']) ?></small>
                         </div>
                         
                         <div class="status-buttons">
@@ -212,11 +212,11 @@
                             <?php 
                             $currentStatus = $attendanceData[$student['id']]['status'] ?? 'present';
                             ?>
-                            <tr data-section="<?= esc($student['grade_level'] . ' - ' . $student['section_name']) ?>" class="list-student-row">
+                            <tr data-section="<?= esc(grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name']) ?>" class="list-student-row">
                                 <td><strong><?= esc($student['first_name'] . ' ' . $student['last_name']) ?></strong></td>
                                 <td><?= esc($student['lrn']) ?></td>
                                 <td>
-                                    <span class="badge bg-secondary"><?= esc($student['grade_level'] . ' - ' . $student['section_name']) ?></span>
+                                    <span class="badge bg-secondary"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0)) . ' - ' . $student['section_name']) ?></span>
                                 </td>
                                 <td>
                                     <div class="btn-group" role="group">

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -34,13 +33,13 @@ class SystemSettingModel extends Model
         }
     }
 
-    public function getCurrentQuarter()
+    public function getCurrentTerm()
     {
-        return (int) $this->getSetting('current_quarter', 1);
+        return (int) $this->getSetting('current_term', 1);
     }
 
-    public function setCurrentQuarter($quarter)
+    public function setCurrentTerm($term)
     {
-        return $this->setSetting('current_quarter', $quarter, 'Current active quarter for grading');
+        return $this->setSetting('current_term', $term, 'Current active term for grading');
     }
 }

@@ -75,7 +75,7 @@
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-0">
     <h5 class="card-title mb-0">
-      <i class="bi bi-people me-2 text-primary"></i>Recipients (<?= count($relatedNotifications) ?>)
+      <i class="bi bi-people me-2 dash-icon-inline"></i>Recipients (<?= count($relatedNotifications) ?>)
     </h5>
   </div>
   <div class="card-body p-0">

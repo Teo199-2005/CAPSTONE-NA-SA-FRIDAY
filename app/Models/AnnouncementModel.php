@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use CodeIgniter\Model;
@@ -27,7 +26,7 @@ class AnnouncementModel extends Model
 
     protected $validationRules      = [
         'title' => 'required|min_length[3]|max_length[255]',
-        'slug'  => 'required|min_length[3]|max_length[255]|is_unique[announcements.slug,id,{id}]',
+        'slug'  => 'required|min_length[3]|max_length[255]',
         'body'  => 'required',
     ];
     protected $validationMessages   = [];

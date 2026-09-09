@@ -1,7 +1,12 @@
-<?= $this->extend('dashboard_layout') ?>
+﻿<?= $this->extend('dashboard_layout') ?>
 <?= $this->section('content') ?>
+<?php
+helper('materials');
+$studentDashboardMaterials = array_slice(public_website_materials(), 0, 9);
+?>
 
 <style>
+/* Student stats: same card style as teacher dashboard */
 /* Force white text on badges */
 .badge.text-white {
   color: #ffffff !important;
@@ -21,6 +26,58 @@
   background-color: #0dcaf0 !important;
   color: #ffffff !important;
 }
+
+.student-widget-divider {
+  height: 1px;
+  width: 100%;
+  background: rgba(59, 130, 246, 0.25);
+  border-radius: 999px;
+}
+
+/* Student dashboard: two equal stacked widgets beside Featured (grid = reliable height) */
+@media (min-width: 992px) {
+  .student-dashboard-progress-row {
+    align-items: stretch !important;
+  }
+  .student-dashboard-progress-col {
+    /* Grid avoids flex 1 1 0 collapsing to 0 height in some browsers */
+    display: grid !important;
+    grid-template-rows: 1fr 1fr;
+    gap: 1rem;
+    align-content: stretch;
+    /* If row stretch ever fails, left column still keeps usable space */
+    min-height: 420px;
+  }
+  .student-dashboard-progress-col .student-progress-card {
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .student-dashboard-progress-col .student-progress-card .card-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .student-dashboard-progress-col .student-progress-card .student-progress-inner {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .student-dashboard-progress-col .student-progress-card .student-progress-inner .student-progress-actions {
+    flex-shrink: 0;
+  }
+
+  .student-dashboard-progress-col .student-progress-card .student-progress-inner.student-overview-inner,
+  .student-dashboard-progress-col .student-progress-card .student-progress-inner.student-term-inner {
+    justify-content: space-between;
+  }
+}
 </style>
 
 <!-- Compact Header Section with Blue Divider -->
@@ -37,45 +94,88 @@
   <div class="blue-divider"></div>
 </div>
 
-<!-- Compact Stats Cards -->
-<div class="d-flex gap-3 mb-4">
-  <div class="stats-card bg-white border-0 shadow-sm rounded-3 flex-fill">
-    <div class="card-body text-center p-3">
-      <div class="stats-icon bg-primary bg-gradient rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 40px; height: 40px;">
-        <i class="bi bi-wallet2 text-white fs-5"></i>
-      </div>
-      <h4 class="stats-number text-primary mb-1 small"><?= esc($student['lrn'] ?? 'Pending') ?></h4>
-      <p class="stats-label text-muted fw-medium mb-0 small">LRN</p>
+<?php if (! empty($nutrition_profile_incomplete)): ?>
+  <div class="alert alert-warning border-0 shadow-sm d-flex align-items-start gap-3 mb-4" role="alert">
+    <i class="bi bi-heart-pulse fs-4 flex-shrink-0 mt-1"></i>
+    <div>
+      <strong>Health profile needed.</strong> Please complete your height, weight, and ethnicity on your profile so the school can keep accurate wellness records.
+      <a href="<?= base_url('student/profile') ?>" class="alert-link fw-semibold d-inline-block mt-1">Go to My Profile</a>
     </div>
   </div>
-  
-  <div class="stats-card bg-white border-0 shadow-sm rounded-3 flex-fill">
-    <div class="card-body text-center p-3">
-      <div class="stats-icon bg-success bg-gradient rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 40px; height: 40px;">
-        <i class="bi bi-mortarboard-fill text-white fs-5"></i>
+<?php endif; ?>
+
+<!-- Quick Stats (same style as teacher dashboard) -->
+<div class="row g-3 mb-3 student-stats-row">
+  <div class="col-12 col-sm-6 col-lg student-stat-col">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="dash-icon-tile dash-icon-tile--slate" aria-hidden="true">
+          <i class="bi bi-wallet2"></i>
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="text-muted small">LRN</div>
+          <div class="fw-bold text-primary" style="font-size:1.15rem; line-height:1.2;"><?= esc(!empty($student['lrn']) ? (string) $student['lrn'] : 'Pending') ?></div>
+        </div>
       </div>
-      <h4 class="stats-number text-success mb-1 small">Grade <?= esc($student['grade_level']) ?></h4>
-      <p class="stats-label text-muted fw-medium mb-0 small">Current Grade Level</p>
     </div>
   </div>
-  
-  <div class="stats-card bg-white border-0 shadow-sm rounded-3 flex-fill">
-    <div class="card-body text-center p-3">
-      <div class="stats-icon bg-info bg-gradient rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 40px; height: 40px;">
-        <i class="bi bi-graph-up-arrow text-white fs-5"></i>
+
+  <div class="col-12 col-sm-6 col-lg student-stat-col">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="dash-icon-tile dash-icon-tile--emerald" aria-hidden="true">
+          <i class="bi bi-mortarboard-fill"></i>
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="text-muted small">Current Grade Level</div>
+          <div class="fw-bold text-success" style="font-size:1.15rem; line-height:1.2;"><?= esc(grade_level_label((int) ($student['grade_level'] ?? 0))) ?></div>
+        </div>
       </div>
-      <h4 class="stats-number text-info mb-1 small"><?= $quarterAverage ? number_format($quarterAverage, 2) : 'N/A' ?></h4>
-      <p class="stats-label text-muted fw-medium mb-0 small">Q<?= $currentQuarter ?> Average</p>
     </div>
   </div>
-  
-  <div class="stats-card bg-white border-0 shadow-sm rounded-3 flex-fill">
-    <div class="card-body text-center p-3">
-      <div class="stats-icon bg-warning bg-gradient rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 40px; height: 40px;">
-        <i class="bi bi-person-check-fill text-white fs-5"></i>
+
+  <div class="col-12 col-sm-6 col-lg student-stat-col">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="dash-icon-tile dash-icon-tile--cyan" aria-hidden="true">
+          <i class="bi bi-graph-up-arrow"></i>
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="text-muted small">T<?= (int) $currentTerm ?> Average</div>
+          <div class="fw-bold" style="font-size:1.15rem; line-height:1.2; color:#0aa2c0;"><?= $termAverage !== null ? number_format($termAverage, 2) : 'N/A' ?></div>
+        </div>
+        <?php if ($termAverage !== null): ?>
+        <a class="btn btn-sm btn-outline-info flex-shrink-0" href="<?= base_url('student/grades') ?>">Grades</a>
+        <?php endif; ?>
       </div>
-      <h4 class="stats-number text-warning mb-1 small"><?= ucfirst(esc($student['enrollment_status'])) ?></h4>
-      <p class="stats-label text-muted fw-medium mb-0 small">Enrollment Status</p>
+    </div>
+  </div>
+
+  <div class="col-12 col-sm-6 col-lg student-stat-col">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="dash-icon-tile dash-icon-tile--amber" aria-hidden="true">
+          <i class="bi bi-person-check-fill"></i>
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="text-muted small">Enrollment Status</div>
+          <div class="fw-bold" style="font-size:1.15rem; line-height:1.2; color:#b58100;"><?= ucfirst(esc($student['enrollment_status'])) ?></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-sm-6 col-lg student-stat-col">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="dash-icon-tile dash-icon-tile--violet" aria-hidden="true">
+          <i class="bi bi-calendar-event"></i>
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="text-muted small">School Year</div>
+          <div class="fw-bold" style="font-size:1.15rem; line-height:1.2; color:#6f42c1;"><?= get_current_school_year() ?></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -83,90 +183,155 @@
 <!-- Blue Divider -->
 <div class="blue-divider mb-4"></div>
 
-<!-- Academic Progress Section -->
-<div class="row mb-4">
-  <div class="col-lg-8">
-    <div class="card bg-white border-0 shadow-sm rounded-3">
-      <div class="card-header bg-transparent border-0 p-3">
-        <h4 class="card-title mb-0 small">Academic Progress Overview</h4>
+<?php
+  $taNumeric = $termAverage !== null ? (float) $termAverage : null;
+  $hasTermGrades = $taNumeric !== null;
+  $taBarWidth = $hasTermGrades ? min(100, max(0, $taNumeric)) : 0;
+  $taLabel = $hasTermGrades ? number_format($taNumeric, 2) . '%' : null;
+?>
+<!-- Academic Progress + Featured (Featured larger) -->
+<div class="row mb-4 student-dashboard-progress-row">
+  <div class="col-lg-5 order-2 order-lg-1 d-flex flex-column gap-3 student-dashboard-progress-col">
+    <!-- Widget 1: Overview — same flex height as term card on lg+ -->
+    <div class="card bg-white border-0 shadow-sm rounded-3 student-progress-card">
+      <div class="card-header bg-transparent border-0 pb-0 pt-3 px-3 flex-shrink-0">
+        <h4 class="card-title mb-0 fw-semibold">Academic Progress Overview</h4>
       </div>
-      <div class="card-body p-3">
-        <div class="d-flex align-items-center mb-3">
-          <div class="me-3">
-            <h5 class="mb-1 small">Current Quarter Performance</h5>
-            <div class="progress mb-2" style="height: 8px;">
-              <div class="progress-bar bg-success" role="progressbar" style="width: <?= $quarterAverage ?>%" aria-valuenow="<?= $quarterAverage ?>" aria-valuemin="0" aria-valuemax="100"></div>
+      <div class="card-body p-3 pt-2">
+        <div class="student-progress-inner student-overview-inner">
+          <div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
+                School Year <?= esc(get_current_school_year()) ?>
+              </span>
+              <span class="badge bg-info-subtle text-primary border border-info-subtle rounded-pill px-3 py-2">
+                Term <?= (int) $currentTerm ?>
+              </span>
             </div>
-            <p class="mb-0 small text-muted"><?= $quarterAverage ?>%</p>
+
+            <p class="text-muted small mb-0">
+              Follow your standing for the selected year and term. Open Grades to see your subject-by-subject performance and remarks.
+            </p>
           </div>
-          <div class="performance-message ms-auto">
-            <span class="badge <?= $performanceMessage['class'] ?> small"><?= $performanceMessage['message'] ?></span>
+
+          <div class="mt-auto pt-3 student-progress-actions">
+            <div class="student-widget-divider mb-3"></div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <a href="<?= base_url('student/grades') ?>" class="btn btn-primary">
+                <i class="bi bi-journal-text me-1"></i> View all grades
+              </a>
+              <div class="small text-muted">Quick breakdown per subject</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Widget 2: Current term -->
+    <div class="card bg-white border-0 shadow-sm rounded-3 student-progress-card">
+      <div class="card-header bg-transparent border-0 pb-0 pt-3 px-3 flex-shrink-0">
+        <h4 class="card-title mb-0 fw-semibold">Current Term Performance</h4>
+      </div>
+      <div class="card-body p-3 pt-2">
+        <div class="student-progress-inner student-term-inner">
+        <?php if (!$hasTermGrades): ?>
+          <div class="h-100 d-flex flex-column">
+            <div class="rounded-3 border bg-light bg-opacity-50 px-3 py-4 d-flex flex-column flex-sm-row align-items-center gap-3">
+              <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width:52px;height:52px;background: rgba(108,117,125,0.15);color:#6c757d;">
+                <i class="bi bi-clipboard-data fs-3"></i>
+              </div>
+              <div class="flex-grow-1 text-center text-sm-start w-100">
+                <p class="mb-1 fw-semibold text-dark">No grades for Term <?= (int) $currentTerm ?> yet</p>
+                <p class="text-muted mb-3" style="font-size: 0.95rem;">
+                  Teachers will post grades here once available. You can still open Grades anytime.
+                </p>
+                <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-sm-start align-items-center">
+                  <span class="badge <?= esc($performanceMessage['class']) ?> px-3 py-2 d-inline-flex align-items-center gap-1">
+                    <i class="bi <?= esc($performanceMessage['icon'] ?? 'bi-info-circle') ?>" aria-hidden="true"></i>
+                    <span><?= esc($performanceMessage['message']) ?></span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="student-widget-divider my-3"></div>
+            <div class="mt-auto d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <a href="<?= base_url('student/grades') ?>" class="btn btn-outline-secondary">
+                <i class="bi bi-journal-text me-1"></i> Open Grades
+              </a>
+              <div class="small text-muted">Per-subject updates</div>
+            </div>
+          </div>
+        <?php else: ?>
+          <div class="h-100 d-flex flex-column">
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+              <div>
+                <div class="small text-muted mb-1">T<?= (int) $currentTerm ?> average</div>
+                <div class="fw-bold text-primary" style="font-size: 2rem; line-height: 1.1;"><?= esc(number_format($taNumeric, 2)) ?>%</div>
+              </div>
+
+              <div class="performance-message flex-shrink-0 align-self-sm-center">
+                <span class="badge <?= esc($performanceMessage['class']) ?> px-3 py-2 d-inline-flex align-items-center gap-1">
+                  <i class="bi <?= esc($performanceMessage['icon'] ?? 'bi-info-circle') ?>" aria-hidden="true"></i>
+                  <span><?= esc($performanceMessage['message']) ?></span>
+                </span>
+              </div>
+            </div>
+
+            <div class="student-widget-divider my-3"></div>
+
+              <div class="progress mb-0" style="height: 12px;">
+                <div
+                  class="progress-bar <?= $taNumeric >= 75 ? 'bg-success' : ($taNumeric >= 60 ? 'bg-info' : 'bg-warning') ?>"
+                  role="progressbar"
+                  style="width: <?= $taBarWidth ?>%"
+                  aria-valuenow="<?= $taBarWidth ?>"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuetext="<?= number_format($taNumeric, 2) ?> percent"
+                ></div>
+              </div>
+
+            <div class="d-flex justify-content-between small text-muted mt-2">
+              <span>Keep improving</span>
+              <span>Great performance</span>
+            </div>
+
+            <div class="mt-auto pt-3 small text-muted">
+              Open Grades for full subject breakdown and remarks.
+            </div>
+          </div>
+        <?php endif; ?>
+        </div>
+      </div>
+    </div>
   </div>
-  
-  <div class="col-lg-4">
-    <!-- Notifications Widget -->
-    <div class="card bg-white border-0 shadow-sm rounded-3 mb-3">
-      <div class="card-header bg-transparent border-0 p-3">
-        <h4 class="card-title mb-0 small d-flex align-items-center">
-          <i class="bi bi-bell me-2 text-primary"></i>Notifications
-          <?php if ($unreadCount > 0): ?>
-            <span class="badge bg-danger ms-auto"><?= $unreadCount ?></span>
+
+  <div class="col-lg-7 order-1 order-lg-2">
+    <div class="card bg-white border-0 shadow-sm rounded-3 overflow-hidden h-100">
+      <div class="featured-student-banner">
+        <?php if (! empty($featuredPosterStudentUrl)): ?>
+          <img
+            src="<?= esc($featuredPosterStudentUrl) ?>"
+            alt=""
+            role="presentation"
+            onerror="this.removeAttribute('src'); this.style.display='none';"
+          >
+        <?php endif; ?>
+        <div style="position:absolute; left:16px; bottom:16px; color:white;">
+          <div style="font-weight:900; font-size:1.35rem; line-height:1.2;">Featured</div>
+          <div style="font-size:1rem; opacity:0.95;">Student Dashboard</div>
+          <?php if (empty($featuredPosterStudentUrl)): ?>
+            <div style="font-size:0.875rem; opacity:0.85;">(No poster uploaded yet)</div>
           <?php endif; ?>
-        </h4>
-      </div>
-      <div class="card-body p-3">
-        <?php if (!empty($notifications)): ?>
-          <?php foreach (array_slice($notifications, 0, 3) as $notification): ?>
-            <div class="notification-item d-flex align-items-start mb-2">
-              <div class="notification-icon bg-<?= $notification['type'] === 'grade' ? 'success' : ($notification['type'] === 'assignment' ? 'warning' : 'info') ?> bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px;">
-                <i class="bi bi-<?= $notification['type'] === 'grade' ? 'check-circle' : ($notification['type'] === 'assignment' ? 'exclamation-triangle' : 'info-circle') ?> text-<?= $notification['type'] === 'grade' ? 'success' : ($notification['type'] === 'assignment' ? 'warning' : 'info') ?>" style="font-size: 10px;"></i>
-              </div>
-              <div class="notification-content flex-grow-1">
-                <p class="mb-0" style="font-size: 11px;"><?= esc($notification['title']) ?></p>
-                <p class="mb-0 text-muted" style="font-size: 10px;"><?= time_ago($notification['created_at']) ?></p>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <p class="text-muted small mb-0">No notifications yet.</p>
-        <?php endif; ?>
-
-      </div>
-    </div>
-
-  </div>
-</div>
-
-
-
-<!-- Recent Data Section -->
-<div class="row mb-4">
-  <div class="col-lg-12">
-    <div class="card bg-white border-0 shadow-sm rounded-3">
-      <div class="card-header bg-transparent border-0 p-3">
-        <h4 class="card-title mb-0 small">Recent Announcements</h4>
-      </div>
-      <div class="card-body p-3">
-        <?php if (!empty($announcements)): ?>
-          <?php foreach ($announcements as $announcement): ?>
-            <div class="announcement-item mb-3">
-              <h6 class="mb-1 small"><?= esc($announcement['title']) ?></h6>
-              <p class="mb-1 small text-muted"><?= esc(substr($announcement['body'] ?? '', 0, 100)) ?>...</p>
-              <p class="mb-0 small text-muted"><?= date('M j, Y', strtotime($announcement['published_at'])) ?></p>
-            </div>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <p class="text-muted small mb-0">No recent announcements.</p>
-        <?php endif; ?>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
+<?= $this->endSection() ?>
 
-
+<?= $this->section('portal_overlays') ?>
+<?= view('partials/public_materials_modal') ?>
 <?= $this->endSection() ?>
